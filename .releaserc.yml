@@ -1,0 +1,14 @@
+branches:
+  - main
+plugins:
+  - '@semantic-release/commit-analyzer':
+      preset: conventionalcommits
+  - '@semantic-release/release-notes-generator':
+      preset: conventionalcommits
+  - '@semantic-release/npm' # Handles bumping version in package.json and publishing to npm
+  - '@semantic-release/github' # Handles creating GitHub Releases
+  - '@semantic-release/git':
+      assets:
+        - package.json
+        - pnpm-lock.yaml # Add other files that should be committed with the version bump if needed
+      message: "chore(release): ${nextRelease.version} [skip ci]\n\n${nextRelease.notes}"

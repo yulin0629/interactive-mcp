@@ -59,13 +59,52 @@ export async function getCmdWindowInput(
     const payload = Buffer.from(JSON.stringify(options)).toString('base64');
     let ui;
 
-    // Original spawn command for all platforms
-    ui = spawn('node', [uiScriptPath, payload], {
-      stdio: ['ignore', 'ignore', 'ignore'],
-      shell: true,
-      detached: true,
-      windowsHide: false, // Should be false if we expect a terminal window
-    });
+    // Platform-specific spawning
+    const platform = os.platform();
+    if (platform === 'darwin') { // macOS
+      // Escape potential special characters in paths/payload for the shell command
+      // For the shell command executed by 'do script', we primarily need to handle spaces
+      // or other characters that might break the command if paths aren't quoted.
+      // The `${...}` interpolation within backticks handles basic variable insertion.
+      // Quoting the paths within nodeCommand handles spaces.
+      const escapedScriptPath = uiScriptPath; // Keep original path, rely on quotes below
+      const escapedPayload = payload;      // Keep original payload, rely on quotes below
+
+      // Construct the command string directly for the shell. Quotes handle paths with spaces.
+      const nodeCommand = `exec node "${escapedScriptPath}" "${escapedPayload}"; exit 0`;
+
+      // Escape the node command for osascript's AppleScript string:
+      // 1. Escape existing backslashes (\ -> \\)
+      // 2. Escape double quotes (" -> \")
+      const escapedNodeCommand = nodeCommand
+        // Escape backslashes first
+        .replace(/\\/g, '\\\\')
+        // Then escape double quotes
+        .replace(/"/g, '\\"'); 
+
+      // Activate Terminal first, then do script with exec
+      const command = `osascript -e 'tell application "Terminal" to activate' -e 'tell application "Terminal" to do script "${escapedNodeCommand}"'`;
+      const commandArgs: string[] = []; // No args needed when command is a single string for shell
+
+      ui = spawn(command, commandArgs, {
+        stdio: ['ignore', 'ignore', 'ignore'],
+        shell: true,
+        detached: true,
+      });
+    } else if (platform === 'win32') { // Windows
+      ui = spawn('node', [uiScriptPath, payload], {
+        stdio: ['ignore', 'ignore', 'ignore'],
+        shell: true,
+        detached: true,
+        windowsHide: false,
+      });
+    } else { // Linux or other - use original method (might not pop up window)
+      ui = spawn('node', [uiScriptPath, payload], {
+        stdio: ['ignore', 'ignore', 'ignore'],
+        shell: true,
+        detached: true,
+      });
+    }
 
     // Listen for process exit events
     ui.on('exit', (code) => {

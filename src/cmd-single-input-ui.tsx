@@ -183,6 +183,7 @@ interface AppProps {
 }
 
 const App: FC<AppProps> = ({ projectName, prompt, timeout, showCountdown, outputFile, predefinedOptions }) => {
+  console.clear(); // Clear console before rendering UI
   const { exit } = useApp();
   const [timeLeft, setTimeLeft] = useState(timeout);
 

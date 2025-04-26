@@ -89,6 +89,7 @@ interface AppProps {
 }
 
 const App: FC<AppProps> = ({ sessionId, title, outputDir }) => {
+  console.clear(); // Clear console before rendering UI
   const { exit } = useApp();
   const [chatHistory, setChatHistory] = useState<ChatMessage[]>([]);
   const [currentQuestionId, setCurrentQuestionId] = useState<string | null>(null);

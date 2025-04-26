@@ -72,21 +72,62 @@ export async function startIntensiveChatSession(
   // Encode options as base64 payload
   const payload = Buffer.from(JSON.stringify(options)).toString('base64');
 
-  // Launch the UI process
-  const process = spawn('node', [uiScriptPath, payload], {
-    stdio: ['ignore', 'ignore', 'ignore'],
-    shell: true,
-    detached: true,
-    windowsHide: false,
-  });
+  // Platform-specific spawning
+  const platform = os.platform();
+  let childProcess: ChildProcess;
+
+  if (platform === 'darwin') { // macOS
+    // Escape potential special characters in paths/payload for the shell command
+    // For the shell command executed by 'do script', we primarily need to handle spaces
+    // or other characters that might break the command if paths aren't quoted.
+    // The `${...}` interpolation within backticks handles basic variable insertion.
+    // Quoting the paths within nodeCommand handles spaces.
+    const escapedScriptPath = uiScriptPath; // Keep original path, rely on quotes below
+    const escapedPayload = payload;      // Keep original payload, rely on quotes below
+
+    // Construct the command string directly for the shell. Quotes handle paths with spaces.
+    const nodeCommand = `exec node "${escapedScriptPath}" "${escapedPayload}"; exit 0`;
+
+    // Escape the node command for osascript's AppleScript string:
+    // 1. Escape existing backslashes (\ -> \\)
+    // 2. Escape double quotes (" -> \")
+    const escapedNodeCommand = nodeCommand
+      // Escape backslashes first
+      .replace(/\\/g, '\\\\') // Using /\\/g instead of /\/g
+      // Then escape double quotes
+      .replace(/"/g, '\\"');
+
+    // Activate Terminal first, then do script with exec
+    const command = `osascript -e 'tell application "Terminal" to activate' -e 'tell application "Terminal" to do script "${escapedNodeCommand}"'`;
+    const commandArgs: string[] = []; // No args needed when command is a single string for shell
+
+    childProcess = spawn(command, commandArgs, {
+      stdio: ['ignore', 'ignore', 'ignore'],
+      shell: true,
+      detached: true,
+    });
+  } else if (platform === 'win32') { // Windows
+    childProcess = spawn('node', [uiScriptPath, payload], {
+      stdio: ['ignore', 'ignore', 'ignore'],
+      shell: true,
+      detached: true,
+      windowsHide: false,
+    });
+  } else { // Linux or other - use original method (might not pop up window)
+    childProcess = spawn('node', [uiScriptPath, payload], {
+      stdio: ['ignore', 'ignore', 'ignore'],
+      shell: true,
+      detached: true,
+    });
+  }
 
   // Unref the process so it can run independently
-  process.unref();
+  childProcess.unref();
 
   // Store session info
   activeSessions[sessionId] = {
     id: sessionId,
-    process,
+    process: childProcess, // Use the conditionally spawned process
     outputDir: sessionDir,
     lastHeartbeatTime: Date.now(),
     isActive: true,
@@ -196,7 +237,17 @@ export async function stopIntensiveChatSession(
   try {
     // Force kill the process if it's still running
     if (!session.process.killed) {
-      process.kill(-session.process.pid!, 'SIGTERM');
+      // Kill process group on Unix-like systems, standard kill on Windows
+      try {
+        if (os.platform() !== 'win32') {
+          process.kill(-session.process.pid!, 'SIGTERM');
+        } else {
+          process.kill(session.process.pid!, 'SIGTERM');
+        }
+      } catch (killError) {
+        // console.error("Error killing process:", killError);
+        // Fallback or ignore if process already exited or group kill failed
+      }
     }
   } catch (e) {
     // Process might have already exited
@@ -270,7 +321,16 @@ function startSessionMonitoring() {
         try {
           // Kill process if it's somehow still running
           if (!activeSessions[sessionId].process.killed) {
-            process.kill(-activeSessions[sessionId].process.pid!, 'SIGTERM');
+            try {
+              if (os.platform() !== 'win32') {
+                process.kill(-activeSessions[sessionId].process.pid!, 'SIGTERM');
+              } else {
+                process.kill(activeSessions[sessionId].process.pid!, 'SIGTERM');
+              }
+            } catch (killError) {
+              // console.error("Error killing process:", killError);
+              // Ignore errors during cleanup
+            }
           }
         } catch (e) {
           // Ignore errors during cleanup

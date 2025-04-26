@@ -1,3 +1,4 @@
+#!/usr/bin/env node
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { z } from 'zod';
@@ -12,7 +13,6 @@ import { USER_INPUT_TIMEOUT_SECONDS } from './constants.js';
 
 // Store active intensive chat sessions
 const activeChatSessions = new Map<string, string>();
-
 // Initialize MCP server
 const server = new McpServer({
   name: 'Interactive MCP',

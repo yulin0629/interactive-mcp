@@ -99,7 +99,7 @@ export const InteractiveInput: FC<InteractiveInputProps> = ({ question, question
 
       {predefinedOptions && predefinedOptions.length > 0 && (
         <Box flexDirection="column" marginBottom={1}>
-          <Text>Use ↑/↓ to select options, type any key for custom input, Enter to submit</Text>
+          <Text dimColor={true}>Use ↑/↓ to select options, Enter to submit</Text>
           {predefinedOptions.map((opt, i) => (
             <Text key={i} color={i === selectedIndex ? (mode === "option" ? 'greenBright' : 'green') : undefined}>
               {i === selectedIndex ? (mode === "option" ? '› ' : '  ') : '  '}{opt}

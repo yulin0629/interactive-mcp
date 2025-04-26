@@ -59,7 +59,14 @@ const updateHeartbeat = async () => {
   if (!options.outputDir) return;
 
   const heartbeatPath = path.join(options.outputDir, 'heartbeat.txt');
-  await fs.writeFile(heartbeatPath, Date.now().toString(), 'utf8');
+  try {
+      const dir = path.dirname(heartbeatPath);
+      await fs.mkdir(dir, { recursive: true }); // Ensure directory exists
+      await fs.writeFile(heartbeatPath, Date.now().toString(), 'utf8');
+  } catch (writeError) {
+      // Log the specific error but allow the poll cycle to continue
+      console.error(`Failed to write heartbeat file ${heartbeatPath}:`, writeError);
+  }
 };
 
 // Register process termination handlers

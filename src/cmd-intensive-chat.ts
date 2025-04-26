@@ -301,8 +301,16 @@ export async function isSessionActive(sessionId: string): Promise<boolean> {
     }
 
     return true;
-  } catch (e) {
-    // Error accessing heartbeat file, session is likely dead
+  } catch (e: any) { // Added ': any' to access e.code safely
+    // If error is ENOENT (file not found), assume session is still starting
+    if (e.code === 'ENOENT') {
+      // Optional: Could add a check here to see if the session is very new
+      // e.g., if (Date.now() - session.startTime < 2000) return true;
+      // For now, let's assume ENOENT means it's possibly still starting.
+      return true;
+    }
+    // For any other error, session is likely dead
+    console.error(`Error checking heartbeat for session ${sessionId}:`, e); // Log other errors
     session.isActive = false;
     return false;
   }

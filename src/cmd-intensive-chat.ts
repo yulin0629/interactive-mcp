@@ -210,7 +210,7 @@ export async function askQuestionInSession(
   }
 
   // Timeout reached
-  return null;
+  return "User closed intensive chat session";
 }
 
 /**

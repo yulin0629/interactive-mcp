@@ -3,11 +3,12 @@ import { render, Box, Text, useApp } from 'ink';
 import { ProgressBar, TextInput } from '@inkjs/ui';
 import { useInput } from 'ink';
 import fs from 'fs/promises';
+import path from 'path'; // Import path module
 
 // Parse command line arguments from a single JSON-encoded argument for safety
 const parseArgs = () => {
   const args = process.argv.slice(2);
-  const defaults = { prompt: "Enter your response:", timeout: 30, showCountdown: false as boolean, outputFile: undefined as string | undefined, predefinedOptions: undefined as string[] | undefined };
+  const defaults = { prompt: "Enter your response:", timeout: 30, showCountdown: false as boolean, sessionId: undefined as string | undefined, outputFile: undefined as string | undefined, predefinedOptions: undefined as string[] | undefined };
   if (args[0]) {
     try {
       // Decode base64-encoded JSON payload to avoid quoting issues
@@ -186,6 +187,9 @@ const App: FC<AppProps> = ({ projectName, prompt, timeout, showCountdown, output
   console.clear(); // Clear console before rendering UI
   const { exit } = useApp();
   const [timeLeft, setTimeLeft] = useState(timeout);
+  const heartbeatFilePath = (outputFile && options.sessionId)
+    ? path.join(path.dirname(outputFile), `cmd-ui-heartbeat-${options.sessionId}.txt`)
+    : undefined;
 
   // Handle countdown and auto-exit on timeout
   useEffect(() => {
@@ -203,8 +207,25 @@ const App: FC<AppProps> = ({ projectName, prompt, timeout, showCountdown, output
       });
     }, 1000);
 
-    return () => clearInterval(timer);
-  }, [exit]);
+    // Add heartbeat interval
+    let heartbeatInterval: NodeJS.Timeout | undefined;
+    if (heartbeatFilePath) {
+      heartbeatInterval = setInterval(async () => {
+        try {
+          await fs.writeFile(heartbeatFilePath, '', 'utf8'); // Update heartbeat file
+        } catch (e) {
+          // Ignore errors writing heartbeat file (e.g., if directory is removed)
+        }
+      }, 1000); // Update every second
+    }
+
+    return () => {
+      clearInterval(timer);
+      if (heartbeatInterval) {
+        clearInterval(heartbeatInterval); // Clear heartbeat interval on cleanup
+      }
+    };
+  }, [exit, heartbeatFilePath]); // Add heartbeatFilePath to dependency array
 
   // Handle final submission
   const handleSubmit = (value: string) => {

@@ -11,17 +11,6 @@ import { USER_INPUT_TIMEOUT_SECONDS } from './constants.js'; // Import the const
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 /**
- * Generate a unique temporary file path
- * @returns Path to a temporary file
- */
-async function getTempFilePath(): Promise<string> {
-  const tempDir = os.tmpdir();
-  const randomId = crypto.randomBytes(8).toString('hex');
-  const tempFile = path.join(tempDir, `cmd-ui-response-${randomId}.txt`);
-  return tempFile;
-}
-
-/**
  * Display a command window with a prompt and return user input
  * @param projectName Name of the project requesting input (used for title)
  * @param promptMessage Message to display to the user
@@ -38,7 +27,10 @@ export async function getCmdWindowInput(
   predefinedOptions?: string[],
 ): Promise<string> {
   // Create a temporary file for the detached process to write to
-  const tempFilePath = await getTempFilePath();
+  const sessionId = crypto.randomBytes(8).toString('hex');
+  const tempDir = os.tmpdir();
+  const tempFilePath = path.join(tempDir, `cmd-ui-response-${sessionId}.txt`);
+  const heartbeatFilePath = path.join(tempDir, `cmd-ui-heartbeat-${sessionId}.txt`);
   let processExited = false;
 
   return new Promise<string>(async (resolve) => {
@@ -51,6 +43,7 @@ export async function getCmdWindowInput(
       prompt: promptMessage,
       timeout: timeoutSeconds,
       showCountdown,
+      sessionId,
       outputFile: tempFilePath,
       predefinedOptions,
     };
@@ -127,6 +120,36 @@ export async function getCmdWindowInput(
     // Create an empty temp file before watching for user response
     await fs.writeFile(tempFilePath, '', 'utf8');
 
+    // Wait briefly for the heartbeat file to potentially be created
+    await new Promise(res => setTimeout(res, 500));
+
+    let lastHeartbeatTime = Date.now();
+    let heartbeatInterval: NodeJS.Timeout | null = null;
+    let heartbeatFileSeen = false; // Track if we've ever seen the heartbeat file
+    const startTime = Date.now(); // Record start time for initial grace period
+
+    // Helper function for cleanup and resolution
+    const cleanupAndResolve = async (response: string) => {
+      if (heartbeatInterval) {
+        clearInterval(heartbeatInterval);
+        heartbeatInterval = null;
+      }
+      if (watcher) {
+        watcher.close(); // Ensure watcher is closed
+      }
+      if (timeoutHandle) {
+        clearTimeout(timeoutHandle); // Ensure timeout is cleared
+      }
+
+      // Use Promise.allSettled to attempt cleanup without failing if one file is missing
+      await Promise.allSettled([
+        fs.unlink(tempFilePath).catch(() => {}), // Ignore errors
+        fs.unlink(heartbeatFilePath).catch(() => {}) // Ignore errors
+      ]);
+
+      resolve(response);
+    };
+
     // Watch for content being written to the temp file
     const watcher = watch(tempFilePath, async (eventType: string) => {
       if (eventType === 'change') {
@@ -136,33 +159,51 @@ export async function getCmdWindowInput(
           const response = data.trim();
           watcher.close();
           clearTimeout(timeoutHandle);
+          if (heartbeatInterval) clearInterval(heartbeatInterval);
           cleanupAndResolve(response);
         }
       }
     });
 
-    // Timeout to stop watching if no response within limit
-    const timeoutHandle = setTimeout(
-      () => {
-        watcher.close();
-        cleanupAndResolve('');
-      },
-      timeoutSeconds * 1000 + 5000,
-    );
-
-    // Helper function for cleanup and resolution
-    const cleanupAndResolve = async (response: string) => {
-      // Clean up the temporary file if it exists
+    // Start heartbeat check interval
+    heartbeatInterval = setInterval(async () => {
       try {
-        await fs.unlink(tempFilePath);
+        const stats = await fs.stat(heartbeatFilePath);
+        const now = Date.now();
+        // If file hasn't been modified in the last 3 seconds, assume dead
+        if (now - stats.mtime.getTime() > 3000) {
+          // console.log('Heartbeat expired.');
+          cleanupAndResolve('');
+        } else {
+          lastHeartbeatTime = now; // Update last known good time
+          heartbeatFileSeen = true; // Mark that we've seen the file
+        }
       } catch (err: any) {
-        // Ignore if file is already removed, otherwise log unexpected errors
-        if (err.code !== 'ENOENT') {
-          // console.error('Error deleting temp file:', err);
+        if (err.code === 'ENOENT') {
+          // File not found
+          if (heartbeatFileSeen) {
+            // File existed before but is now gone, assume dead
+            // console.log('Heartbeat file disappeared.');
+            cleanupAndResolve('');
+          } else if (Date.now() - startTime > 7000) {
+            // File never appeared and initial grace period (7s) passed, assume dead
+            // console.log('Heartbeat file never appeared.');
+            cleanupAndResolve('');
+          }
+          // Otherwise, file just hasn't appeared yet, wait longer
+        } else if (err.code !== 'ENOENT') {
+          // Log other errors, but potentially continue?
+          // console.error('Heartbeat check error:', err);
+          // Maybe stop checking if there's a persistent error other than ENOENT?
+          // cleanupAndResolve(''); // Or resolve immediately on other errors?
         }
       }
+    }, 1500); // Check every 1.5 seconds
 
-      resolve(response);
-    };
+    // Timeout to stop watching if no response within limit
+    const timeoutHandle = setTimeout(() => {
+      // console.log('Overall timeout reached.');
+      cleanupAndResolve('');
+    }, timeoutSeconds * 1000 + 5000); // Add a bit more buffer
   });
 }

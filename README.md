@@ -8,13 +8,8 @@ _(Note: This project is in its early stages.)_
 
 **Want a quick overview?** Check out the introductory blog post: [Stop Your AI Assistant From Guessing — Introducing interactive-mcp](https://medium.com/@ttommyth/stop-your-ai-assistant-from-guessing-introducing-interactive-mcp-b42ac6d9b0e2)
 
-## Features
-
-- **Interactive Prompts:** Ask users questions via OS notifications or a dedicated command prompt.
-- **Simple Notifications:** Send informational messages to the user's OS.
-- **Intensive Chat:** Initiate persistent command-line chat sessions for multi-turn interactions.
-- **Cross-Platform:** Designed to work on Windows, macOS, and Linux (leveraging `node-notifier`).
-- **Customizable Timeout:** Set a custom timeout for user prompts (default: 30 seconds) using the `-t` or `--timeout` flag.
+**See it in action:**
+[![Interactive Demo Video](https://img.youtube.com/vi/ebwDZdfgSHo/hqdefault.jpg)](https://youtu.be/ebwDZdfgSHo)
 
 ## Tools
 
@@ -25,6 +20,18 @@ This server exposes the following tools via the Model Context Protocol (MCP):
 - `start_intensive_chat`: Initiates a persistent command-line chat session.
 - `ask_intensive_chat`: Asks a question within an active intensive chat session.
 - `stop_intensive_chat`: Closes an active intensive chat session.
+
+## Demo
+
+Here are demonstrations of the interactive features:
+
+| Normal Question                 | Completion Notification         |
+| :-----------------------------: | :-----------------------------: |
+| ![Normal Question Demo](./docs/assets/normal-question.gif)   | ![Completion Notification Demo](./docs/assets/end-notification.gif)|
+
+| Intensive Chat Start            | Intensive Chat End              |
+| :-----------------------------: | :-----------------------------: |
+| ![Start Intensive Chat Demo](./docs/assets/start-intensive-chat.gif) | ![End Intensive Chat Demo](./docs/assets/end-intensive-chat.gif)|
 
 ## Usage Scenarios
 
@@ -94,16 +101,6 @@ For a smoother experience on macOS using the default `Terminal.app`, consider th
 
 - **(Shell Tab):** Under **"When the shell exits"** (**Terminal > Settings > Profiles > _[Your Profile]_ > Shell**), select **"Close if the shell exited cleanly"** or **"Close the window"**. This helps manage windows when the MCP server starts and stops.
 - **(Advanced Tab):** Under **Input** (**Terminal > Settings > Profiles > _[Your Profile]_ > Advanced**), uncheck the option **"Delete sends Control-H"**. By default, macOS Terminal sends Control-H (ASCII Backspace) when you press Delete. Unchecking this might help in applications that expect a different sequence, though achieving a specific sequence like `\033[3~` (often needed for forward delete) might still require other configurations or terminal alternatives.
-
-## Demo
-
-Here's a demonstration of the interactive features (chat and prompts):
-
-[![Interactive Demo Video](https://img.youtube.com/vi/ebwDZdfgSHo/hqdefault.jpg)](https://youtu.be/ebwDZdfgSHo)
-
-Here's a demonstration of the completion notification:
-
-[![Completion Notification Demo Video](https://img.youtube.com/vi/A7V5Qd56QPU/hqdefault.jpg)](https://youtu.be/A7V5Qd56QPU)
 
 ## Development Setup
 

@@ -55,8 +55,8 @@ export async function startIntensiveChatSession(
   // Generate a unique session ID
   const sessionId = path.basename(sessionDir).replace('intensive-chat-', '');
 
-  // Path to the UI script
-  const uiScriptPath = path.join(__dirname, 'cmd-intensive-chat-ui.js');
+  // Path to the UI script - Updated to use the compiled 'ui.js' filename
+  const uiScriptPath = path.join(__dirname, 'ui.js');
 
   // Create options payload for the UI
   const options = {

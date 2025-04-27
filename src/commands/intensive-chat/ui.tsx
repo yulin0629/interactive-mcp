@@ -4,8 +4,8 @@ import { ProgressBar } from '@inkjs/ui';
 import fs from 'fs/promises';
 import path from 'path';
 import crypto from 'crypto';
-import { InteractiveInput } from './components/InteractiveInput.js';
-import { USER_INPUT_TIMEOUT_SECONDS } from './constants.js'; // Import the constant
+import { InteractiveInput } from '@/components/InteractiveInput.js';
+import { USER_INPUT_TIMEOUT_SECONDS } from '@/constants.js'; // Import the constant
 
 // Interface for chat message
 interface ChatMessage {
@@ -312,9 +312,8 @@ const App: FC<AppProps> = ({ sessionId, title, outputDir, timeoutSeconds }) => {
     }
   };
 
-  // Calculate progress bar value
-  const progressValue =
-    timeLeft !== null ? (timeLeft / timeoutSeconds) * 100 : 0; // Use timeout from props
+  // Calculate progress bar value (moved slightly down, renamed to percentage)
+  const percentage = timeLeft !== null ? (timeLeft / timeoutSeconds) * 100 : 0; // Use timeout from props
 
   return (
     <Box
@@ -376,7 +375,7 @@ const App: FC<AppProps> = ({ sessionId, title, outputDir, timeoutSeconds }) => {
               <Text color={timeLeft <= 10 ? 'red' : 'yellow'}>
                 Time remaining: {timeLeft}s
               </Text>
-              <ProgressBar value={progressValue} />
+              <ProgressBar value={percentage} />
             </Box>
           )}
         </Box>

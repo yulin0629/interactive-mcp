@@ -5,7 +5,8 @@ import fsPromises from 'fs/promises';
 import { watch, FSWatcher } from 'fs';
 import os from 'os';
 import crypto from 'crypto';
-import { USER_INPUT_TIMEOUT_SECONDS } from './constants.js'; // Import the constant
+// Updated import to use @ alias
+import { USER_INPUT_TIMEOUT_SECONDS } from '@/constants.js'; // Import the constant
 
 // Get the directory name of the current module
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -39,7 +40,7 @@ export async function getCmdWindowInput(
     // Wrap the async setup logic in an IIFE
     void (async () => {
       // Path to the UI script (will be in the same directory after compilation)
-      const uiScriptPath = path.join(__dirname, 'cmd-single-input-ui.js');
+      const uiScriptPath = path.join(__dirname, 'ui.js');
 
       // Spawn a new process to run the UI in a detached window, passing all options as a single JSON argument to prevent injection
       const options = {

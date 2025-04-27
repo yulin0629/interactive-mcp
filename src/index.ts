@@ -5,12 +5,12 @@ import { z } from 'zod';
 import notifier from 'node-notifier';
 import yargs from 'yargs';
 import { hideBin } from 'yargs/helpers';
-import { getCmdWindowInput } from './cmd-input.js';
+import { getCmdWindowInput } from './commands/input/index.js';
 import {
   startIntensiveChatSession,
   askQuestionInSession,
   stopIntensiveChatSession,
-} from './cmd-intensive-chat.js';
+} from './commands/intensive-chat/index.js';
 import { USER_INPUT_TIMEOUT_SECONDS } from './constants.js';
 
 // Import tool definitions using the new structure

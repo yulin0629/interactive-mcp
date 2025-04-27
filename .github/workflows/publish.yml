@@ -1,9 +1,9 @@
 name: Release Package
 
 on:
-  push:
-    branches:
-      - main # Trigger on pushes to the main branch
+  # push:
+  #   branches:
+  #     - main # Trigger on pushes to the main branch
   workflow_dispatch: # Allows manual triggering
 
 jobs:

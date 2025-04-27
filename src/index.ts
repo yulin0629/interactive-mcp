@@ -177,6 +177,9 @@ Feel free to ask anything! **Proactive questioning is preferred over making assu
 <bestPractices>
 - Keep questions concise and specific
 - Provide clear options when applicable
+- Do not ask the question if you have another tool that can answer the question
+  - e.g. when you searching file in the current repository, do not ask the question "Do you want to search for a file in the current repository?"
+  - e.g. prefer to use other tools to find the answer (Cursor tools or other MCP Server tools)
 - Limit questions to only what's necessary **to resolve the uncertainty**
 - Format complex questions into simple choices
 - Reference specific code or files when relevant
@@ -332,6 +335,9 @@ server.tool(
 <bestPractices>
 - Use a descriptive session title related to the task
 - Start with a clear initial question when possible
+- Do not ask the question if you have another tool that can answer the question
+  - e.g. when you searching file in the current repository, do not ask the question "Do you want to search for a file in the current repository?"
+  - e.g. prefer to use other tools to find the answer (Cursor tools or other MCP Server tools)
 - Always store the returned session ID for later use
 - Always close the session when you're done with stop_intensive_chat
 </bestPractices>

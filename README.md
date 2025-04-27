@@ -6,6 +6,8 @@ A MCP Server implemented in Node.js/TypeScript, facilitating interactive communi
 
 _(Note: This project is in its early stages.)_
 
+**Want a quick overview?** Check out the introductory blog post: [Stop Your AI Assistant From Guessing — Introducing interactive-mcp](https://medium.com/@ttommyth/stop-your-ai-assistant-from-guessing-introducing-interactive-mcp-b42ac6d9b0e2)
+
 ## Features
 
 - **Interactive Prompts:** Ask users questions via OS notifications or a dedicated command prompt.
@@ -117,7 +119,7 @@ This section is primarily for developers looking to modify or contribute to the 
 1. Clone the repository:
 
    ```bash
-   git clone <your-repo-url>
+   git clone https://github.com/ttommyth/interactive-mcp.git
    cd interactive-mcp
    ```
 

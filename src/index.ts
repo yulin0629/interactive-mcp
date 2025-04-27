@@ -37,25 +37,25 @@ const server = new McpServer({
     tools: {
       request_user_input: {
         description:
-          'Send a question to the user and await their reply via OS notification or prompt.',
+          'Send a question to the user via a pop-up command prompt and await their reply.',
         parameters: {
           type: 'object',
           properties: {
             projectName: {
               type: 'string',
               description:
-                'Identifies the context/project making the request (appears in notification title)',
+                'Identifies the context/project making the request (used in prompt formatting)',
             },
             message: {
               type: 'string',
               description:
-                'The specific question for the user (appears in notification body)',
+                'The specific question for the user (appears in the prompt)',
             },
             predefinedOptions: {
               type: 'array',
               items: { type: 'string' },
               description:
-                'Predefined options / predicted answers for the user to choose from (optional, if not provided, user can type any response)',
+                'Predefined options for the user to choose from (optional)',
             },
           },
           required: ['projectName', 'message'],
@@ -139,7 +139,7 @@ const server = new McpServer({
 server.tool(
   'request_user_input',
   `<description>
-Send a question to the user. **Crucial for clarifying requirements, confirming plans, or resolving ambiguity.**
+Send a question to the user via a pop-up command prompt. **Crucial for clarifying requirements, confirming plans, or resolving ambiguity.**
 You should call this tool whenever it has **any** uncertainty or needs clarification or confirmation, even for trivial or silly questions.
 Feel free to ask anything! **Proactive questioning is preferred over making assumptions.**
 </description>
@@ -165,13 +165,12 @@ Feel free to ask anything! **Proactive questioning is preferred over making assu
 </whenToUseThisTool>
 
 <features>
-- Cross-platform notification system (Windows, macOS, Linux)
+- Pop-up command prompt display for user input
 - Configurable timeout mechanism to prevent indefinite waiting (set via -t/--timeout, defaults to ${globalTimeoutSeconds} seconds)
-- Windows-specific command prompt display for better visibility
 - Returns user response or timeout notification
 - Maintains context across user interactions
 - Handles empty responses gracefully
-- Properly formats notifications with project context
+- Properly formats prompt with project context
 </features>
 
 <bestPractices>
@@ -188,9 +187,9 @@ Feel free to ask anything! **Proactive questioning is preferred over making assu
 </bestPractices>
 
 <parameters>
-- projectName: Identifies the context/project making the request (appears in notification title)
-- message: The specific question for the user (appears in notification body)
-- predefinedOptions: Predefined options / predicted answers for the user to choose from (optional, if not provided, user can type any response)
+- projectName: Identifies the context/project making the request (used in prompt formatting)
+- message: The specific question for the user (appears in the prompt)
+- predefinedOptions: Predefined options for the user to choose from (optional)
 </parameters>
 
 <examples>
@@ -205,19 +204,15 @@ Feel free to ask anything! **Proactive questioning is preferred over making assu
     projectName: z
       .string()
       .describe(
-        'Identifies the context/project making the request (appears in notification title)',
+        'Identifies the context/project making the request (used in prompt formatting)',
       ),
     message: z
       .string()
-      .describe(
-        'The specific question for the user (appears in notification body)',
-      ),
+      .describe('The specific question for the user (appears in the prompt)'),
     predefinedOptions: z
       .array(z.string())
       .optional()
-      .describe(
-        'Predefined options / predicted answers for the user to choose from (optional, if not provided, user can type any response)',
-      ),
+      .describe('Predefined options for the user to choose from (optional)'),
   },
   async ({ projectName, message, predefinedOptions }) => {
     const promptMessage = `${projectName}: ${message}`;

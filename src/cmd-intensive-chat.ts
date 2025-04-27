@@ -42,15 +42,11 @@ async function createSessionDir(): Promise<string> {
 /**
  * Start an intensive chat session
  * @param title Title for the chat session
- * @param initialQuestion Optional initial question to kick off the session
- * @param initialOptions Optional predefined options for the initial question
  * @param timeoutSeconds Optional timeout for each question in seconds
  * @returns Session ID for the created session
  */
 export async function startIntensiveChatSession(
   title: string,
-  initialQuestion?: string,
-  initialOptions?: string[],
   timeoutSeconds?: number,
 ): Promise<string> {
   // Create a session directory
@@ -67,8 +63,6 @@ export async function startIntensiveChatSession(
     sessionId,
     title,
     outputDir: sessionDir,
-    initialQuestion,
-    initialPredefinedOptions: initialOptions,
     timeoutSeconds,
   };
 

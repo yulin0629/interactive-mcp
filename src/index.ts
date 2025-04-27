@@ -91,16 +91,6 @@ const server = new McpServer({
               type: 'string',
               description: 'Title for the intensive chat session',
             },
-            initialQuestion: {
-              type: 'string',
-              description: 'First question to ask in the session (optional)',
-            },
-            initialOptions: {
-              type: 'array',
-              items: { type: 'string' },
-              description:
-                'Predefined options for the initial question (optional)',
-            },
           },
           required: ['sessionTitle'],
         },
@@ -349,33 +339,19 @@ server.tool(
 
 <parameters>
 - sessionTitle: Title for the intensive chat session (appears at the top of the console)
-- initialQuestion: First question to ask in the session (optional)
-- initialOptions: Predefined options for the initial question (optional)
 </parameters>
 
 <examples>
 - Start session for project setup: { "sessionTitle": "Project Configuration" }
-- Start with initial question: { "sessionTitle": "Project Setup", "initialQuestion": "What is your project named?" }
-- With predefined options: { "sessionTitle": "Next.js Setup", "initialQuestion": "Would you like to use TypeScript?", "initialOptions": ["Yes", "No"] }
 </examples>`,
   {
     sessionTitle: z.string().describe('Title for the intensive chat session'),
-    initialQuestion: z
-      .string()
-      .optional()
-      .describe('First question to ask in the session (optional)'),
-    initialOptions: z
-      .array(z.string())
-      .optional()
-      .describe('Predefined options for the initial question (optional)'),
   },
-  async ({ sessionTitle, initialQuestion, initialOptions }) => {
+  async ({ sessionTitle }) => {
     try {
       // Start a new intensive chat session, passing global timeout
       const sessionId = await startIntensiveChatSession(
         sessionTitle,
-        initialQuestion,
-        initialOptions,
         globalTimeoutSeconds,
       );
 

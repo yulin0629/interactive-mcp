@@ -22,8 +22,6 @@ const parseArgs = () => {
     sessionId: crypto.randomUUID(),
     title: "Interactive Chat Session",
     outputDir: undefined as string | undefined,
-    initialQuestion: undefined as string | undefined,
-    initialPredefinedOptions: undefined as string[] | undefined,
     timeoutSeconds: USER_INPUT_TIMEOUT_SECONDS,
   };
 

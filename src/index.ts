@@ -3,6 +3,8 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { z } from 'zod';
 import notifier from 'node-notifier';
+import yargs from 'yargs';
+import { hideBin } from 'yargs/helpers';
 import { getCmdWindowInput } from './cmd-input.js';
 import {
   startIntensiveChatSession,
@@ -10,6 +12,20 @@ import {
   stopIntensiveChatSession,
 } from './cmd-intensive-chat.js';
 import { USER_INPUT_TIMEOUT_SECONDS } from './constants.js';
+
+// Parse command-line arguments for global timeout
+const argv = yargs(hideBin(process.argv))
+  .option('timeout', {
+    alias: 't',
+    type: 'number',
+    description: 'Default timeout for user input prompts in seconds',
+    default: USER_INPUT_TIMEOUT_SECONDS,
+  })
+  .help()
+  .alias('help', 'h')
+  .parseSync();
+
+const globalTimeoutSeconds = argv.timeout;
 
 // Store active intensive chat sessions
 const activeChatSessions = new Map<string, string>();
@@ -34,6 +50,12 @@ const server = new McpServer({
               type: 'string',
               description:
                 'The specific question for the user (appears in notification body)',
+            },
+            predefinedOptions: {
+              type: 'array',
+              items: { type: 'string' },
+              description:
+                'Predefined options / predicted answers for the user to choose from (optional, if not provided, user can type any response)',
             },
           },
           required: ['projectName', 'message'],
@@ -72,6 +94,12 @@ const server = new McpServer({
             initialQuestion: {
               type: 'string',
               description: 'First question to ask in the session (optional)',
+            },
+            initialOptions: {
+              type: 'array',
+              items: { type: 'string' },
+              description:
+                'Predefined options for the initial question (optional)',
             },
           },
           required: ['sessionTitle'],
@@ -148,7 +176,7 @@ Feel free to ask anything! **Proactive questioning is preferred over making assu
 
 <features>
 - Cross-platform notification system (Windows, macOS, Linux)
-- Timeout mechanism to prevent indefinite waiting (${USER_INPUT_TIMEOUT_SECONDS} seconds)
+- Configurable timeout mechanism to prevent indefinite waiting (set via -t/--timeout, defaults to ${globalTimeoutSeconds} seconds)
 - Windows-specific command prompt display for better visibility
 - Returns user response or timeout notification
 - Maintains context across user interactions
@@ -203,7 +231,7 @@ Feel free to ask anything! **Proactive questioning is preferred over making assu
     const answer = await getCmdWindowInput(
       projectName,
       promptMessage,
-      USER_INPUT_TIMEOUT_SECONDS,
+      globalTimeoutSeconds,
       true,
       predefinedOptions,
     );
@@ -306,6 +334,7 @@ server.tool(
 <features>
 - Opens a persistent console window for continuous interaction
 - Supports starting with an initial question
+- Configurable timeout for each question (set via -t/--timeout, defaults to ${globalTimeoutSeconds} seconds)
 - Returns a session ID for subsequent interactions
 - Keeps full chat history visible to the user
 - Maintains state between questions
@@ -342,11 +371,12 @@ server.tool(
   },
   async ({ sessionTitle, initialQuestion, initialOptions }) => {
     try {
-      // Start a new intensive chat session
+      // Start a new intensive chat session, passing global timeout
       const sessionId = await startIntensiveChatSession(
         sessionTitle,
         initialQuestion,
         initialOptions,
+        globalTimeoutSeconds,
       );
 
       // Track this session for the client

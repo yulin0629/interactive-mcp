@@ -22,6 +22,9 @@ const parseArgs = () => {
     sessionId: crypto.randomUUID(),
     title: "Interactive Chat Session",
     outputDir: undefined as string | undefined,
+    initialQuestion: undefined as string | undefined,
+    initialPredefinedOptions: undefined as string[] | undefined,
+    timeoutSeconds: USER_INPUT_TIMEOUT_SECONDS,
   };
 
   if (args[0]) {
@@ -60,12 +63,12 @@ const updateHeartbeat = async () => {
 
   const heartbeatPath = path.join(options.outputDir, 'heartbeat.txt');
   try {
-      const dir = path.dirname(heartbeatPath);
-      await fs.mkdir(dir, { recursive: true }); // Ensure directory exists
-      await fs.writeFile(heartbeatPath, Date.now().toString(), 'utf8');
+    const dir = path.dirname(heartbeatPath);
+    await fs.mkdir(dir, { recursive: true }); // Ensure directory exists
+    await fs.writeFile(heartbeatPath, Date.now().toString(), 'utf8');
   } catch (writeError) {
-      // Log the specific error but allow the poll cycle to continue
-      console.error(`Failed to write heartbeat file ${heartbeatPath}:`, writeError);
+    // Log the specific error but allow the poll cycle to continue
+    console.error(`Failed to write heartbeat file ${heartbeatPath}:`, writeError);
   }
 };
 
@@ -93,9 +96,10 @@ interface AppProps {
   sessionId: string;
   title: string;
   outputDir?: string;
+  timeoutSeconds: number;
 }
 
-const App: FC<AppProps> = ({ sessionId, title, outputDir }) => {
+const App: FC<AppProps> = ({ sessionId, title, outputDir, timeoutSeconds }) => {
   console.clear(); // Clear console before rendering UI
   const { exit } = useApp();
   const [chatHistory, setChatHistory] = useState<ChatMessage[]>([]);
@@ -242,7 +246,7 @@ const App: FC<AppProps> = ({ sessionId, title, outputDir }) => {
 
     setCurrentQuestionId(questionId);
     setCurrentPredefinedOptions(options);
-    setTimeLeft(USER_INPUT_TIMEOUT_SECONDS); // Use imported constant
+    setTimeLeft(timeoutSeconds); // Use timeout from props
   };
 
   // Handle user submitting an answer
@@ -277,7 +281,7 @@ const App: FC<AppProps> = ({ sessionId, title, outputDir }) => {
   };
 
   // Calculate progress bar value
-  const progressValue = timeLeft !== null ? (timeLeft / USER_INPUT_TIMEOUT_SECONDS) * 100 : 0; // Use imported constant
+  const progressValue = timeLeft !== null ? (timeLeft / timeoutSeconds) * 100 : 0; // Use timeout from props
 
   return (
     <Box flexDirection="column" padding={1} borderStyle="round" borderColor="blue">

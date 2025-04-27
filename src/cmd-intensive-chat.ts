@@ -44,12 +44,14 @@ async function createSessionDir(): Promise<string> {
  * @param title Title for the chat session
  * @param initialQuestion Optional initial question to kick off the session
  * @param initialOptions Optional predefined options for the initial question
+ * @param timeoutSeconds Optional timeout for each question in seconds
  * @returns Session ID for the created session
  */
 export async function startIntensiveChatSession(
   title: string,
   initialQuestion?: string,
   initialOptions?: string[],
+  timeoutSeconds?: number,
 ): Promise<string> {
   // Create a session directory
   const sessionDir = await createSessionDir();
@@ -67,6 +69,7 @@ export async function startIntensiveChatSession(
     outputDir: sessionDir,
     initialQuestion,
     initialPredefinedOptions: initialOptions,
+    timeoutSeconds,
   };
 
   // Encode options as base64 payload
@@ -76,14 +79,15 @@ export async function startIntensiveChatSession(
   const platform = os.platform();
   let childProcess: ChildProcess;
 
-  if (platform === 'darwin') { // macOS
+  if (platform === 'darwin') {
+    // macOS
     // Escape potential special characters in paths/payload for the shell command
     // For the shell command executed by 'do script', we primarily need to handle spaces
     // or other characters that might break the command if paths aren't quoted.
     // The `${...}` interpolation within backticks handles basic variable insertion.
     // Quoting the paths within nodeCommand handles spaces.
     const escapedScriptPath = uiScriptPath; // Keep original path, rely on quotes below
-    const escapedPayload = payload;      // Keep original payload, rely on quotes below
+    const escapedPayload = payload; // Keep original payload, rely on quotes below
 
     // Construct the command string directly for the shell. Quotes handle paths with spaces.
     const nodeCommand = `exec node "${escapedScriptPath}" "${escapedPayload}"; exit 0`;
@@ -106,14 +110,16 @@ export async function startIntensiveChatSession(
       shell: true,
       detached: true,
     });
-  } else if (platform === 'win32') { // Windows
+  } else if (platform === 'win32') {
+    // Windows
     childProcess = spawn('node', [uiScriptPath, payload], {
       stdio: ['ignore', 'ignore', 'ignore'],
       shell: true,
       detached: true,
       windowsHide: false,
     });
-  } else { // Linux or other - use original method (might not pop up window)
+  } else {
+    // Linux or other - use original method (might not pop up window)
     childProcess = spawn('node', [uiScriptPath, payload], {
       stdio: ['ignore', 'ignore', 'ignore'],
       shell: true,
@@ -210,7 +216,7 @@ export async function askQuestionInSession(
   }
 
   // Timeout reached
-  return "User closed intensive chat session";
+  return 'User closed intensive chat session';
 }
 
 /**
@@ -301,7 +307,8 @@ export async function isSessionActive(sessionId: string): Promise<boolean> {
     }
 
     return true;
-  } catch (e: any) { // Added ': any' to access e.code safely
+  } catch (e: any) {
+    // Added ': any' to access e.code safely
     // If error is ENOENT (file not found), assume session is still starting
     if (e.code === 'ENOENT') {
       // Optional: Could add a check here to see if the session is very new
@@ -331,7 +338,10 @@ function startSessionMonitoring() {
           if (!activeSessions[sessionId].process.killed) {
             try {
               if (os.platform() !== 'win32') {
-                process.kill(-activeSessions[sessionId].process.pid!, 'SIGTERM');
+                process.kill(
+                  -activeSessions[sessionId].process.pid!,
+                  'SIGTERM',
+                );
               } else {
                 process.kill(activeSessions[sessionId].process.pid!, 'SIGTERM');
               }

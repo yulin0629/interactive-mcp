@@ -198,7 +198,7 @@ export async function askQuestionInSession(
       await fs.unlink(responseFilePath).catch(() => {});
 
       return response;
-    } catch (e) {
+    } catch {
       // Response file doesn't exist yet, check session status
       if (!(await isSessionActive(sessionId))) {
         return null; // Session has ended
@@ -244,12 +244,12 @@ export async function stopIntensiveChatSession(
         } else {
           process.kill(session.process.pid!, 'SIGTERM');
         }
-      } catch (killError) {
+      } catch {
         // console.error("Error killing process:", killError);
         // Fallback or ignore if process already exited or group kill failed
       }
     }
-  } catch (e) {
+  } catch {
     // Process might have already exited
   }
 
@@ -257,15 +257,18 @@ export async function stopIntensiveChatSession(
   session.isActive = false;
 
   // Clean up session directory after a delay
-  setTimeout(async () => {
-    try {
-      await fs.rm(session.outputDir, { recursive: true, force: true });
-    } catch (e) {
-      // Ignore errors during cleanup
-    }
+  setTimeout(() => {
+    // Use void to mark intentionally unhandled promise
+    void (async () => {
+      try {
+        await fs.rm(session.outputDir, { recursive: true, force: true });
+      } catch {
+        // Ignore errors during cleanup
+      }
 
-    // Remove from active sessions
-    delete activeSessions[sessionId];
+      // Remove from active sessions
+      delete activeSessions[sessionId];
+    })();
   }, 2000);
 
   return true;
@@ -301,17 +304,22 @@ export async function isSessionActive(sessionId: string): Promise<boolean> {
     }
 
     return true;
-  } catch (e: any) {
-    // Added ': any' to access e.code safely
+  } catch (err: unknown) {
     // If error is ENOENT (file not found), assume session is still starting
-    if (e.code === 'ENOENT') {
+    // Check if err is an object and has a code property before accessing it
+    if (
+      err &&
+      typeof err === 'object' &&
+      'code' in err &&
+      err.code === 'ENOENT'
+    ) {
       // Optional: Could add a check here to see if the session is very new
       // e.g., if (Date.now() - session.startTime < 2000) return true;
       // For now, let's assume ENOENT means it's possibly still starting.
       return true;
     }
     // For any other error, session is likely dead
-    console.error(`Error checking heartbeat for session ${sessionId}:`, e); // Log other errors
+    console.error(`Error checking heartbeat for session ${sessionId}:`, err); // Log other errors
     session.isActive = false;
     return false;
   }
@@ -321,46 +329,53 @@ export async function isSessionActive(sessionId: string): Promise<boolean> {
  * Start background monitoring of all active sessions
  */
 function startSessionMonitoring() {
-  setInterval(async () => {
-    for (const sessionId of Object.keys(activeSessions)) {
-      const isActive = await isSessionActive(sessionId);
+  // Remove async from setInterval callback
+  setInterval(() => {
+    // Use void to mark intentionally unhandled promise
+    void (async () => {
+      for (const sessionId of Object.keys(activeSessions)) {
+        const isActive = await isSessionActive(sessionId);
 
-      if (!isActive && activeSessions[sessionId]) {
-        // Clean up inactive session
-        try {
-          // Kill process if it's somehow still running
-          if (!activeSessions[sessionId].process.killed) {
-            try {
-              if (os.platform() !== 'win32') {
-                process.kill(
-                  -activeSessions[sessionId].process.pid!,
-                  'SIGTERM',
-                );
-              } else {
-                process.kill(activeSessions[sessionId].process.pid!, 'SIGTERM');
+        if (!isActive && activeSessions[sessionId]) {
+          // Clean up inactive session
+          try {
+            // Kill process if it's somehow still running
+            if (!activeSessions[sessionId].process.killed) {
+              try {
+                if (os.platform() !== 'win32') {
+                  process.kill(
+                    -activeSessions[sessionId].process.pid!,
+                    'SIGTERM',
+                  );
+                } else {
+                  process.kill(
+                    activeSessions[sessionId].process.pid!,
+                    'SIGTERM',
+                  );
+                }
+              } catch {
+                // console.error("Error killing process:", killError);
+                // Ignore errors during cleanup
               }
-            } catch (killError) {
-              // console.error("Error killing process:", killError);
-              // Ignore errors during cleanup
             }
+          } catch {
+            // Ignore errors during cleanup
           }
-        } catch (e) {
-          // Ignore errors during cleanup
-        }
 
-        // Clean up session directory
-        try {
-          await fs.rm(activeSessions[sessionId].outputDir, {
-            recursive: true,
-            force: true,
-          });
-        } catch (e) {
-          // Ignore errors during cleanup
-        }
+          // Clean up session directory
+          try {
+            await fs.rm(activeSessions[sessionId].outputDir, {
+              recursive: true,
+              force: true,
+            });
+          } catch {
+            // Ignore errors during cleanup
+          }
 
-        // Remove from active sessions
-        delete activeSessions[sessionId];
+          // Remove from active sessions
+          delete activeSessions[sessionId];
+        }
       }
-    }
+    })();
   }, 5000); // Check every 5 seconds
 }

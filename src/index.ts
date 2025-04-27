@@ -288,10 +288,9 @@ server.tool(
     projectName: z.string().describe('Notification title'),
     message: z.string().describe('Notification body'),
   },
-  async ({ projectName, message }) => {
-    // send OS notification
-    notifier.notify({ title: projectName, message, wait: true });
-    return { content: [{ type: 'text', text: 'Message complete.' }] };
+  ({ projectName, message }) => {
+    notifier.notify({ title: projectName, message });
+    return { content: [{ type: 'text', text: 'Notification sent.' }] };
   },
 );
 
@@ -366,13 +365,18 @@ server.tool(
           },
         ],
       };
-    } catch (error) {
-      console.error('Error starting intensive chat session:', error);
+    } catch (error: unknown) {
+      let errorMessage = 'Failed to start intensive chat session.';
+      if (error instanceof Error) {
+        errorMessage = `Failed to start intensive chat session: ${error.message}`;
+      } else if (typeof error === 'string') {
+        errorMessage = `Failed to start intensive chat session: ${error}`;
+      }
       return {
         content: [
           {
             type: 'text',
-            text: `Failed to start intensive chat session: ${(error as any)?.message || 'unknown error'}`,
+            text: errorMessage,
           },
         ],
       };
@@ -477,13 +481,18 @@ server.tool(
           content: [{ type: 'text', text: `User replied: ${answer}` }],
         };
       }
-    } catch (error) {
-      console.error('Error asking question in intensive chat:', error);
+    } catch (error: unknown) {
+      let errorMessage = 'Failed to ask question in session.';
+      if (error instanceof Error) {
+        errorMessage = `Failed to ask question in session: ${error.message}`;
+      } else if (typeof error === 'string') {
+        errorMessage = `Failed to ask question in session: ${error}`;
+      }
       return {
         content: [
           {
             type: 'text',
-            text: `Failed to ask question: ${(error as any)?.message || 'unknown error'}`,
+            text: errorMessage,
           },
         ],
       };
@@ -546,32 +555,22 @@ server.tool(
     try {
       // Stop the session
       const success = await stopIntensiveChatSession(sessionId);
-
-      // Remove from active sessions
+      // Remove session from map if successful
       if (success) {
         activeChatSessions.delete(sessionId);
       }
-
-      return {
-        content: [
-          {
-            type: 'text',
-            text: success
-              ? 'Intensive chat session closed successfully.'
-              : 'Failed to close intensive chat session. It may have already ended.',
-          },
-        ],
-      };
-    } catch (error) {
-      console.error('Error stopping intensive chat session:', error);
-      return {
-        content: [
-          {
-            type: 'text',
-            text: `Failed to stop chat session: ${(error as any)?.message || 'unknown error'}`,
-          },
-        ],
-      };
+      const message = success
+        ? 'Session stopped successfully.'
+        : 'Session not found or already stopped.';
+      return { content: [{ type: 'text', text: message }] };
+    } catch (error: unknown) {
+      let errorMessage = 'Failed to stop intensive chat session.';
+      if (error instanceof Error) {
+        errorMessage = `Failed to stop intensive chat session: ${error.message}`;
+      } else if (typeof error === 'string') {
+        errorMessage = `Failed to stop intensive chat session: ${error}`;
+      }
+      return { content: [{ type: 'text', text: errorMessage }] };
     }
   },
 );

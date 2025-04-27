@@ -1,7 +1,6 @@
 import React, { FC, useState, useEffect, useRef } from 'react';
 import { render, Box, Text, useApp } from 'ink';
 import { ProgressBar } from '@inkjs/ui';
-import { useInput } from 'ink';
 import fs from 'fs/promises';
 import path from 'path';
 import crypto from 'crypto';
@@ -20,7 +19,7 @@ const parseArgs = () => {
   const args = process.argv.slice(2);
   const defaults = {
     sessionId: crypto.randomUUID(),
-    title: "Interactive Chat Session",
+    title: 'Interactive Chat Session',
     outputDir: undefined as string | undefined,
     timeoutSeconds: USER_INPUT_TIMEOUT_SECONDS,
   };
@@ -45,14 +44,17 @@ const options = parseArgs();
 const writeResponseToFile = async (questionId: string, response: string) => {
   if (!options.outputDir) return;
 
-  // Create response file path 
-  const responseFilePath = path.join(options.outputDir, `response-${questionId}.txt`);
+  // Create response file path
+  const responseFilePath = path.join(
+    options.outputDir,
+    `response-${questionId}.txt`,
+  );
 
   // Write file in UTF-8 format
   await fs.writeFile(responseFilePath, response, 'utf8');
 
   //wait 500 ms
-  await new Promise(resolve => setTimeout(resolve, 500));
+  await new Promise((resolve) => setTimeout(resolve, 500));
 };
 
 // Create a heartbeat file to indicate the session is still active
@@ -66,7 +68,10 @@ const updateHeartbeat = async () => {
     await fs.writeFile(heartbeatPath, Date.now().toString(), 'utf8');
   } catch (writeError) {
     // Log the specific error but allow the poll cycle to continue
-    console.error(`Failed to write heartbeat file ${heartbeatPath}:`, writeError);
+    console.error(
+      `Failed to write heartbeat file ${heartbeatPath}:`,
+      writeError,
+    );
   }
 };
 
@@ -76,7 +81,7 @@ const handleExit = () => {
     // Write exit file to indicate session has ended
     fs.writeFile(path.join(options.outputDir, 'session-closed.txt'), '', 'utf8')
       .then(() => process.exit(0))
-      .catch(error => {
+      .catch((error) => {
         console.error('Failed to write exit file:', error);
         process.exit(1);
       });
@@ -99,10 +104,14 @@ interface AppProps {
 
 const App: FC<AppProps> = ({ sessionId, title, outputDir, timeoutSeconds }) => {
   console.clear(); // Clear console before rendering UI
-  const { exit } = useApp();
+  const { exit: appExit } = useApp();
   const [chatHistory, setChatHistory] = useState<ChatMessage[]>([]);
-  const [currentQuestionId, setCurrentQuestionId] = useState<string | null>(null);
-  const [currentPredefinedOptions, setCurrentPredefinedOptions] = useState<string[] | undefined>(undefined);
+  const [currentQuestionId, setCurrentQuestionId] = useState<string | null>(
+    null,
+  );
+  const [currentPredefinedOptions, setCurrentPredefinedOptions] = useState<
+    string[] | undefined
+  >(undefined);
   const [timeLeft, setTimeLeft] = useState<number | null>(null); // State for countdown timer
   const timerRef = useRef<NodeJS.Timeout | null>(null); // Ref to hold timer ID
 
@@ -138,7 +147,8 @@ const App: FC<AppProps> = ({ sessionId, title, outputDir, timeoutSeconds }) => {
                 inputData !== null &&
                 typeof inputData.id === 'string' &&
                 typeof inputData.text === 'string' &&
-                (inputData.options === undefined || Array.isArray(inputData.options))
+                (inputData.options === undefined ||
+                  Array.isArray(inputData.options))
               ) {
                 questionId = inputData.id;
                 questionText = inputData.text;
@@ -148,11 +158,14 @@ const App: FC<AppProps> = ({ sessionId, title, outputDir, timeoutSeconds }) => {
                   : undefined;
               } else {
                 console.error(
-                  `Invalid format in ${sessionId}.json. Expected JSON with id (string), text (string), and optional options (array).`
+                  `Invalid format in ${sessionId}.json. Expected JSON with id (string), text (string), and optional options (array).`,
                 );
               }
             } catch (parseError) {
-              console.error(`Error parsing ${sessionId}.json as JSON:`, parseError);
+              console.error(
+                `Error parsing ${sessionId}.json as JSON:`,
+                parseError,
+              );
             }
 
             // Proceed only if we successfully parsed the question ID and text
@@ -168,10 +181,20 @@ const App: FC<AppProps> = ({ sessionId, title, outputDir, timeoutSeconds }) => {
               await fs.unlink(inputFilePath);
             }
           }
-        } catch (e: any) {
-          if (e.code !== 'ENOENT') {
-            console.error(`Error checking/reading input file ${inputFilePath}:`, e);
+        } catch (e: unknown) {
+          // Type guard to check if it's an error with a code property
+          if (
+            typeof e === 'object' &&
+            e !== null &&
+            'code' in e &&
+            (e as { code: unknown }).code !== 'ENOENT'
+          ) {
+            console.error(
+              `Error checking/reading input file ${inputFilePath}:`,
+              e,
+            );
           }
+          // If it's not an error with a code or the code is ENOENT, we ignore it silently.
         }
 
         // Check if we should exit
@@ -180,10 +203,9 @@ const App: FC<AppProps> = ({ sessionId, title, outputDir, timeoutSeconds }) => {
           await fs.stat(closeFilePath);
           // If close file exists, exit the process
           handleExit();
-        } catch (e) {
+        } catch (_e) {
           // No close request
         }
-
       } catch (error) {
         console.error('Error in poll cycle:', error);
       }
@@ -205,7 +227,7 @@ const App: FC<AppProps> = ({ sessionId, title, outputDir, timeoutSeconds }) => {
     // Start timer if not already running
     if (!timerRef.current) {
       timerRef.current = setInterval(() => {
-        setTimeLeft(prev => (prev !== null ? prev - 1 : null));
+        setTimeLeft((prev) => (prev !== null ? prev - 1 : null));
       }, 1000);
     }
 
@@ -227,19 +249,23 @@ const App: FC<AppProps> = ({ sessionId, title, outputDir, timeoutSeconds }) => {
   }, [timeLeft, currentQuestionId]); // Rerun effect when timeLeft or currentQuestionId changes
 
   // Add a new question to the chat
-  const addNewQuestion = (questionId: string, questionText: string, options?: string[]) => {
+  const addNewQuestion = (
+    questionId: string,
+    questionText: string,
+    options?: string[],
+  ) => {
     // Clear existing timer before starting new one
     if (timerRef.current) {
       clearInterval(timerRef.current);
       timerRef.current = null;
     }
 
-    setChatHistory(prev => [
+    setChatHistory((prev) => [
       ...prev,
       {
         text: questionText,
         isQuestion: true,
-      }
+      },
     ]);
 
     setCurrentQuestionId(questionId);
@@ -257,15 +283,23 @@ const App: FC<AppProps> = ({ sessionId, title, outputDir, timeoutSeconds }) => {
     setTimeLeft(null); // Reset timer state
 
     // Update the chat history with the answer
-    setChatHistory(prev =>
-      prev.map(msg => {
+    setChatHistory((prev) =>
+      prev.map((msg) => {
         // Find the last question in history that matches the ID and doesn't have an answer yet
         // Use slice().reverse().find() for broader compatibility instead of findLast()
-        if (msg.isQuestion && !msg.answer && msg === prev.slice().reverse().find((m: ChatMessage) => m.isQuestion && !m.answer)) {
+        if (
+          msg.isQuestion &&
+          !msg.answer &&
+          msg ===
+            prev
+              .slice()
+              .reverse()
+              .find((m: ChatMessage) => m.isQuestion && !m.answer)
+        ) {
           return { ...msg, answer: value };
         }
         return msg;
-      })
+      }),
     );
 
     // Reset current question state
@@ -279,12 +313,20 @@ const App: FC<AppProps> = ({ sessionId, title, outputDir, timeoutSeconds }) => {
   };
 
   // Calculate progress bar value
-  const progressValue = timeLeft !== null ? (timeLeft / timeoutSeconds) * 100 : 0; // Use timeout from props
+  const progressValue =
+    timeLeft !== null ? (timeLeft / timeoutSeconds) * 100 : 0; // Use timeout from props
 
   return (
-    <Box flexDirection="column" padding={1} borderStyle="round" borderColor="blue">
+    <Box
+      flexDirection="column"
+      padding={1}
+      borderStyle="round"
+      borderColor="blue"
+    >
       <Box marginBottom={1} flexDirection="column" width="100%">
-        <Text bold color="magentaBright" wrap="wrap">{title}</Text>
+        <Text bold color="magentaBright" wrap="wrap">
+          {title}
+        </Text>
         <Text color="gray">Session ID: {sessionId}</Text>
         <Text color="gray">Press Ctrl+C to exit the chat session</Text>
       </Box>
@@ -294,10 +336,14 @@ const App: FC<AppProps> = ({ sessionId, title, outputDir, timeoutSeconds }) => {
         {chatHistory.map((msg, i) => (
           <Box key={i} flexDirection="column" marginY={1}>
             {msg.isQuestion ? (
-              <Text color="cyan" wrap="wrap">Q: {msg.text}</Text>
+              <Text color="cyan" wrap="wrap">
+                Q: {msg.text}
+              </Text>
             ) : null}
             {msg.answer ? (
-              <Text color="green" wrap="wrap">A: {msg.answer}</Text>
+              <Text color="green" wrap="wrap">
+                A: {msg.answer}
+              </Text>
             ) : null}
           </Box>
         ))}
@@ -310,11 +356,16 @@ const App: FC<AppProps> = ({ sessionId, title, outputDir, timeoutSeconds }) => {
           marginTop={1}
           padding={1}
           borderStyle="single"
-          borderColor={timeLeft !== null && timeLeft <= 10 ? "red" : "yellow"} // Highlight border when time is low
+          borderColor={timeLeft !== null && timeLeft <= 10 ? 'red' : 'yellow'} // Highlight border when time is low
         >
           <InteractiveInput
             // Use slice().reverse().find() for broader compatibility instead of findLast()
-            question={chatHistory.slice().reverse().find((m: ChatMessage) => m.isQuestion && !m.answer)?.text || ""}
+            question={
+              chatHistory
+                .slice()
+                .reverse()
+                .find((m: ChatMessage) => m.isQuestion && !m.answer)?.text || ''
+            }
             questionId={currentQuestionId}
             predefinedOptions={currentPredefinedOptions}
             onSubmit={handleSubmit}
@@ -322,7 +373,9 @@ const App: FC<AppProps> = ({ sessionId, title, outputDir, timeoutSeconds }) => {
           {/* Countdown Timer and Progress Bar */}
           {timeLeft !== null && (
             <Box flexDirection="column" marginTop={1}>
-              <Text color={timeLeft <= 10 ? "red" : "yellow"}>Time remaining: {timeLeft}s</Text>
+              <Text color={timeLeft <= 10 ? 'red' : 'yellow'}>
+                Time remaining: {timeLeft}s
+              </Text>
               <ProgressBar value={progressValue} />
             </Box>
           )}

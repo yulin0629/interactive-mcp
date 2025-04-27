@@ -1,0 +1,11 @@
+#!/bin/sh
+
+# Format code with Prettier
+pnpm format
+# Lint and fix code with ESLint
+pnpm lint --fix
+# Stage the potential changes made by formatters/linters
+git add .
+
+# Check types (existing command)
+pnpm check-types

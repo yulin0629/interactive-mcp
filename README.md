@@ -11,6 +11,10 @@ _(Note: This project is in its early stages.)_
 **See it in action:**
 [![Interactive Demo Video](https://img.youtube.com/vi/ebwDZdfgSHo/hqdefault.jpg)](https://youtu.be/ebwDZdfgSHo)
 
+<a href="https://glama.ai/mcp/servers/@ttommyth/interactive-mcp">
+  <img width="380" height="200" src="https://glama.ai/mcp/servers/@ttommyth/interactive-mcp/badge" alt="interactive-mcp MCP server" />
+</a>
+
 ## Tools
 
 This server exposes the following tools via the Model Context Protocol (MCP):

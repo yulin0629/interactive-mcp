@@ -2,18 +2,21 @@
 
 [![npm version](https://img.shields.io/npm/v/interactive-mcp)](https://www.npmjs.com/package/interactive-mcp) [![npm downloads](https://img.shields.io/npm/dm/interactive-mcp)](https://www.npmjs.com/package/interactive-mcp) [![GitHub license](https://img.shields.io/github/license/ttommyth/interactive-mcp)](https://github.com/ttommyth/interactive-mcp/blob/main/LICENSE) [![code style: prettier](https://img.shields.io/badge/code_style-prettier-ff69b4.svg?style=flat-square)](https://github.com/prettier/prettier) [![Platforms](https://img.shields.io/badge/Platform-Windows%20%7C%20macOS%20%7C%20Linux-blue)](https://github.com/ttommyth/interactive-mcp) [![GitHub last commit](https://img.shields.io/github/last-commit/ttommyth/interactive-mcp)](https://github.com/ttommyth/interactive-mcp/commits/main)
 
+<div align="center">
+<a href="https://glama.ai/mcp/servers/@ttommyth/interactive-mcp">
+  <img width="380" height="200" src="https://glama.ai/mcp/servers/@ttommyth/interactive-mcp/badge" alt="interactive-mcp MCP server" />
+</a>
+</div>
+
 A MCP Server implemented in Node.js/TypeScript, facilitating interactive communication between LLMs and users. **Note:** This server is designed to run locally alongside the MCP client (e.g., Claude Desktop, VS Code), as it needs direct access to the user's operating system to display notifications and command-line prompts.
 
 _(Note: This project is in its early stages.)_
 
 **Want a quick overview?** Check out the introductory blog post: [Stop Your AI Assistant From Guessing — Introducing interactive-mcp](https://medium.com/@ttommyth/stop-your-ai-assistant-from-guessing-introducing-interactive-mcp-b42ac6d9b0e2)
 
-**See it in action:**
-[![Interactive Demo Video](https://img.youtube.com/vi/ebwDZdfgSHo/hqdefault.jpg)](https://youtu.be/ebwDZdfgSHo)
-
-<a href="https://glama.ai/mcp/servers/@ttommyth/interactive-mcp">
-  <img width="380" height="200" src="https://glama.ai/mcp/servers/@ttommyth/interactive-mcp/badge" alt="interactive-mcp MCP server" />
-</a>
+|                                                   Demo Video                                                    |
+| :-------------------------------------------------------------------------------------------------------------: |
+| [![Interactive Demo Video](https://img.youtube.com/vi/ebwDZdfgSHo/hqdefault.jpg)](https://youtu.be/ebwDZdfgSHo) |
 
 ## Tools
 
@@ -29,13 +32,13 @@ This server exposes the following tools via the Model Context Protocol (MCP):
 
 Here are demonstrations of the interactive features:
 
-| Normal Question                 | Completion Notification         |
-| :-----------------------------: | :-----------------------------: |
-| ![Normal Question Demo](./docs/assets/normal-question.gif)   | ![Completion Notification Demo](./docs/assets/end-notification.gif)|
+|                      Normal Question                       |                       Completion Notification                       |
+| :--------------------------------------------------------: | :-----------------------------------------------------------------: |
+| ![Normal Question Demo](./docs/assets/normal-question.gif) | ![Completion Notification Demo](./docs/assets/end-notification.gif) |
 
-| Intensive Chat Start            | Intensive Chat End              |
-| :-----------------------------: | :-----------------------------: |
-| ![Start Intensive Chat Demo](./docs/assets/start-intensive-chat.gif) | ![End Intensive Chat Demo](./docs/assets/end-intensive-chat.gif)|
+|                         Intensive Chat Start                         |                        Intensive Chat End                        |
+| :------------------------------------------------------------------: | :--------------------------------------------------------------: |
+| ![Start Intensive Chat Demo](./docs/assets/start-intensive-chat.gif) | ![End Intensive Chat Demo](./docs/assets/end-intensive-chat.gif) |
 
 ## Usage Scenarios
 
@@ -50,7 +53,7 @@ This server is ideal for scenarios where an LLM needs to interact directly with 
 
 This section explains how to configure MCP clients to use the `interactive-mcp` server.
 
-By default, user prompts will time out after 30 seconds. You can change this by adding the timeout flag (`-t <seconds>` or `--timeout <seconds>`) to the `args` array after `"--"` when configuring your client.
+By default, user prompts will time out after 30 seconds. You can customize server options like timeout or disabled tools by adding command-line flags to the `args` array after `"--"` when configuring your client.
 
 Please make sure you have the `npx` command available.
 
@@ -69,7 +72,7 @@ Add the following minimal configuration to your `claude_desktop_config.json` (Cl
 }
 ```
 
-**Example with Custom Timeout (60 seconds):**
+**Example with Custom Timeout (60s):**
 
 ```json
 {
@@ -136,12 +139,24 @@ This section is primarily for developers looking to modify or contribute to the 
 pnpm start
 ```
 
-To run with a custom timeout (e.g., 60 seconds), pass the arguments after `--`:
+#### Command-Line Options
 
-```bash
-pnpm start -- -t 60
-# or
-pnpm start -- --timeout 60
+The `interactive-mcp` server accepts the following command-line options. These should typically be configured in your MCP client's JSON settings by adding them to the `args` array after a `"--"` separator (see "Client Configuration" examples).
+
+| Option            | Alias | Description                                                                                                                                                                                           |
+| ----------------- | ----- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `--timeout`       | `-t`  | Sets the default timeout (in seconds) for user input prompts. Defaults to 30 seconds.                                                                                                                 |
+| `--disable-tools` | `-d`  | Disables specific tools or groups (comma-separated list). Prevents the server from advertising or registering them. Options: `request_user_input`, `message_complete_notification`, `intensive_chat`. |
+
+**Example:** Setting multiple options in the client config `args` array:
+
+```jsonc
+// Example combining options in client config's "args":
+// ... (other args like "-y", "interactive-mcp")
+"--", // Separator for server arguments
+"-t", "90", // Set timeout to 90 seconds
+"--disable-tools", "message_complete_notification,intensive_chat" // Disable notifications and intensive chat
+// ...
 ```
 
 ## Development Commands

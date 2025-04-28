@@ -5,3 +5,4 @@ dist/
 .vscode/
 localtestscript/
 .cursor
+.DS_Store

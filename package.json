@@ -42,6 +42,7 @@
     "globals": "^16.0.0",
     "husky": "^9.1.7",
     "jiti": "^2.4.2",
+    "lint-staged": "^15.5.1",
     "prettier": "^3.5.3",
     "semantic-release": "^24.2.3",
     "tsc-alias": "^1.8.15",
@@ -58,5 +59,13 @@
     "react-dom": "^18.3.1",
     "yargs": "^17.7.2",
     "zod": "^3.24.3"
+  },
+  "lint-staged": {
+    "*.{js,ts,jsx,tsx}": [
+      "eslint --fix"
+    ],
+    "*.{js,ts,jsx,tsx,json,md}": [
+      "prettier --write"
+    ]
   }
 }

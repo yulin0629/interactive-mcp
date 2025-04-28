@@ -65,8 +65,7 @@ Feel free to ask anything! **Proactive questioning is preferred over making assu
 
 <features>
 - Pop-up command prompt display for user input
-- Configurable timeout mechanism to prevent indefinite waiting (set via -t/--timeout, defaults to ${globalTimeoutSeconds} seconds)
-- Returns user response or timeout notification
+- Returns user response or timeout notification (timeout defaults to ${globalTimeoutSeconds} seconds))
 - Maintains context across user interactions
 - Handles empty responses gracefully
 - Properly formats prompt with project context

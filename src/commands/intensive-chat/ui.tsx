@@ -260,6 +260,7 @@ const App: FC<AppProps> = ({ sessionId, title, outputDir, timeoutSeconds }) => {
     questionText: string,
     options?: string[],
   ) => {
+    console.clear(); // Clear console before displaying new question
     // Clear existing timer before starting new one
     if (timerRef.current) {
       clearInterval(timerRef.current);

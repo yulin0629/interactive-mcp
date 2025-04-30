@@ -5,10 +5,19 @@ on:
   #   branches:
   #     - main # Trigger on pushes to the main branch
   workflow_dispatch: # Allows manual triggering
+    inputs: # Add inputs section
+      release_type: # Add release_type input
+        description: 'Type of release to perform (stable or rc)' # Add description
+        required: true # Make it required
+        default: 'stable' # Default to stable
+        type: choice # Use choice type
+        options: # Define options
+          - stable
+          - rc
 
 jobs:
   release:
-    name: Release
+    name: Release (${{ github.event.inputs.release_type }}) # Add input to job name for clarity
     runs-on: ubuntu-latest
     environment: release # This line pauses the job until approved
     permissions:
@@ -18,9 +27,19 @@ jobs:
       id-token: write # Needed for npm provenance if enabled
 
     steps:
+      - name: Determine Branch
+        id: determine_branch
+        run: |
+          if [[ "${{ github.event.inputs.release_type }}" == "rc" ]]; then
+            echo "branch=next" >> $GITHUB_OUTPUT
+          else
+            echo "branch=main" >> $GITHUB_OUTPUT
+          fi
+
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
+          ref: ${{ steps.determine_branch.outputs.branch }} # Checkout the determined branch
           fetch-depth: 0 # Fetch all history for semantic-release analysis
           persist-credentials: false # Recommended for semantic-release
 

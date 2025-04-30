@@ -104,10 +104,9 @@ Add the following minimal configuration to your User Settings (JSON) file or `.v
 
 #### macOS Recommendations
 
-For a smoother experience on macOS using the default `Terminal.app`, consider these profile settings:
+For a smoother experience on macOS using the default `Terminal.app`, consider this profile setting:
 
 - **(Shell Tab):** Under **"When the shell exits"** (**Terminal > Settings > Profiles > _[Your Profile]_ > Shell**), select **"Close if the shell exited cleanly"** or **"Close the window"**. This helps manage windows when the MCP server starts and stops.
-- **(Advanced Tab):** Under **Input** (**Terminal > Settings > Profiles > _[Your Profile]_ > Advanced**), uncheck the option **"Delete sends Control-H"**. By default, macOS Terminal sends Control-H (ASCII Backspace) when you press Delete. Unchecking this might help in applications that expect a different sequence, though achieving a specific sequence like `\033[3~` (often needed for forward delete) might still require other configurations or terminal alternatives.
 
 ## Development Setup
 

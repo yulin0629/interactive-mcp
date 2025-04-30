@@ -26,15 +26,16 @@ export const InteractiveInput: FC<InteractiveInputProps> = ({
     if (predefinedOptions.length > 0) {
       if (key.upArrow) {
         setMode('option');
-        setSelectedIndex((prev) => Math.max(0, prev - 1));
+        setSelectedIndex(
+          (prev) =>
+            (prev - 1 + predefinedOptions.length) % predefinedOptions.length,
+        );
         return;
       }
 
       if (key.downArrow) {
         setMode('option');
-        setSelectedIndex((prev) =>
-          Math.min(predefinedOptions.length - 1, prev + 1),
-        );
+        setSelectedIndex((prev) => (prev + 1) % predefinedOptions.length);
         return;
       }
     }

@@ -4,6 +4,7 @@ import { ProgressBar } from '@inkjs/ui';
 import { useInput } from 'ink';
 import fs from 'fs/promises';
 import path from 'path'; // Import path module
+import logger from '../../utils/logger.js';
 
 // Parse command line arguments from a single JSON-encoded argument for safety
 const parseArgs = () => {
@@ -23,7 +24,10 @@ const parseArgs = () => {
       const parsed = JSON.parse(decoded);
       return { ...defaults, ...parsed };
     } catch (e) {
-      console.error('Invalid input options payload, using defaults.', e);
+      logger.error(
+        'Invalid input options payload, using defaults.',
+        e instanceof Error ? e.message : e,
+      );
     }
   }
   return defaults;
@@ -46,7 +50,7 @@ const handleExit = () => {
     writeResponseToFile('')
       .then(() => process.exit(0))
       .catch((error) => {
-        console.error('Failed to write exit file:', error);
+        logger.error('Failed to write exit file:', error);
         process.exit(1);
       });
   } else {
@@ -253,7 +257,7 @@ const App: FC<AppProps> = ({
           // Write the timeout indicator string to output file on timeout, then exit
           writeResponseToFile('__TIMEOUT__')
             .catch((err) =>
-              console.error('Failed to write to output file:', err),
+              logger.error('Failed to write to output file:', err),
             )
             .finally(() => exit());
           return 0;
@@ -285,8 +289,10 @@ const App: FC<AppProps> = ({
   // Handle final submission
   const handleSubmit = (value: string) => {
     writeResponseToFile(value)
-      .catch((err) => console.error('Failed to write to output file:', err))
-      .finally(() => exit());
+      .then(() => {
+        exit();
+      })
+      .catch((err) => logger.error('Failed to write to output file:', err));
   };
 
   // Calculate progress value for the countdown bar (0 to 100)

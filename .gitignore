@@ -6,3 +6,6 @@ dist/
 localtestscript/
 .cursor
 .DS_Store
+
+# Log files
+logs/

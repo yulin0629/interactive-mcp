@@ -6,6 +6,7 @@ import path from 'path';
 import crypto from 'crypto';
 import { InteractiveInput } from '@/components/InteractiveInput.js';
 import { USER_INPUT_TIMEOUT_SECONDS } from '@/constants.js'; // Import the constant
+import logger from '../../utils/logger.js';
 
 // Interface for chat message
 interface ChatMessage {
@@ -31,7 +32,7 @@ const parseArgs = () => {
       const parsed = JSON.parse(decoded);
       return { ...defaults, ...parsed };
     } catch (e) {
-      console.error('Invalid input options payload, using defaults.', e);
+      logger.error('Invalid input options payload, using defaults.', e);
     }
   }
   return defaults;
@@ -68,7 +69,7 @@ const updateHeartbeat = async () => {
     await fs.writeFile(heartbeatPath, Date.now().toString(), 'utf8');
   } catch (writeError) {
     // Log the specific error but allow the poll cycle to continue
-    console.error(
+    logger.error(
       `Failed to write heartbeat file ${heartbeatPath}:`,
       writeError,
     );
@@ -82,7 +83,7 @@ const handleExit = () => {
     fs.writeFile(path.join(options.outputDir, 'session-closed.txt'), '', 'utf8')
       .then(() => process.exit(0))
       .catch((error) => {
-        console.error('Failed to write exit file:', error);
+        logger.error('Failed to write exit file:', error);
         process.exit(1);
       });
   } else {
@@ -157,12 +158,12 @@ const App: FC<AppProps> = ({ sessionId, title, outputDir, timeoutSeconds }) => {
                   ? inputData.options.map(String)
                   : undefined;
               } else {
-                console.error(
+                logger.error(
                   `Invalid format in ${sessionId}.json. Expected JSON with id (string), text (string), and optional options (array).`,
                 );
               }
             } catch (parseError) {
-              console.error(
+              logger.error(
                 `Error parsing ${sessionId}.json as JSON:`,
                 parseError,
               );
@@ -177,7 +178,7 @@ const App: FC<AppProps> = ({ sessionId, title, outputDir, timeoutSeconds }) => {
               await fs.unlink(inputFilePath);
             } else {
               // If parsing failed or format was invalid, delete the problematic file
-              console.error(`Deleting invalid input file: ${inputFilePath}`);
+              logger.error(`Deleting invalid input file: ${inputFilePath}`);
               await fs.unlink(inputFilePath);
             }
           }
@@ -189,7 +190,7 @@ const App: FC<AppProps> = ({ sessionId, title, outputDir, timeoutSeconds }) => {
             'code' in e &&
             (e as { code: unknown }).code !== 'ENOENT'
           ) {
-            console.error(
+            logger.error(
               `Error checking/reading input file ${inputFilePath}:`,
               e,
             );
@@ -207,7 +208,7 @@ const App: FC<AppProps> = ({ sessionId, title, outputDir, timeoutSeconds }) => {
           // No close request
         }
       } catch (error) {
-        console.error('Error in poll cycle:', error);
+        logger.error('Error in poll cycle:', error);
       }
     }, 100);
 

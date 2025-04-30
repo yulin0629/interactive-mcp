@@ -4,6 +4,7 @@ import { fileURLToPath } from 'url';
 import fs from 'fs/promises';
 import os from 'os';
 import crypto from 'crypto';
+import logger from '../../utils/logger.js';
 
 // Get the directory name of the current module
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -318,8 +319,11 @@ export async function isSessionActive(sessionId: string): Promise<boolean> {
       // For now, let's assume ENOENT means it's possibly still starting.
       return true;
     }
-    // For any other error, session is likely dead
-    console.error(`Error checking heartbeat for session ${sessionId}:`, err); // Log other errors
+    // Handle cases where err is not an object with a code property or other errors
+    logger.error(
+      `Error checking heartbeat for session ${sessionId}:`,
+      err instanceof Error ? err.message : String(err),
+    );
     session.isActive = false;
     return false;
   }

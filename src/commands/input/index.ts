@@ -7,9 +7,23 @@ import os from 'os';
 import crypto from 'crypto';
 // Updated import to use @ alias
 import { USER_INPUT_TIMEOUT_SECONDS } from '@/constants.js'; // Import the constant
+import logger from '../../utils/logger.js';
 
 // Get the directory name of the current module
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
+
+// Define cleanupResources outside the promise to be accessible in the final catch
+async function cleanupResources(
+  heartbeatPath: string,
+  responsePath: string,
+  sessionId: string,
+) {
+  await Promise.allSettled([
+    fsPromises.unlink(responsePath).catch(() => {}),
+    fsPromises.unlink(heartbeatPath).catch(() => {}),
+    // Potentially add cleanup for other session-related files if needed
+  ]);
+}
 
 /**
  * Display a command window with a prompt and return user input
@@ -80,7 +94,7 @@ export async function getCmdWindowInput(
           // 2. Escape double quotes (" -> \")
           const escapedNodeCommand = nodeCommand
             // Escape backslashes first
-            .replace(/\\/g, '\\\\')
+            .replace(/\\/g, '\\')
             // Then escape double quotes
             .replace(/"/g, '\\"');
 
@@ -118,6 +132,7 @@ export async function getCmdWindowInput(
         let heartbeatFileSeen = false; // Track if we've ever seen the heartbeat file
         const startTime = Date.now(); // Record start time for initial grace period
 
+        // Define cleanupAndResolve inside the promise scope
         const cleanupAndResolve = async (response: string) => {
           if (heartbeatInterval) {
             clearInterval(heartbeatInterval);
@@ -132,11 +147,7 @@ export async function getCmdWindowInput(
             timeoutHandle = null; // Nullify timeout handle
           }
 
-          // Use Promise.allSettled to attempt cleanup without failing if one file is missing
-          await Promise.allSettled([
-            fsPromises.unlink(tempFilePath).catch(() => {}), // Use renamed import
-            fsPromises.unlink(heartbeatFilePath).catch(() => {}), // Use renamed import
-          ]);
+          await cleanupResources(heartbeatFilePath, tempFilePath, sessionId);
 
           resolve(response);
         };
@@ -182,7 +193,7 @@ export async function getCmdWindowInput(
                   void cleanupAndResolve(response); // Mark promise as intentionally ignored
                 }
               } catch (readError) {
-                console.error('Error reading response file:', readError);
+                logger.error('Error reading response file:', readError);
                 void cleanupAndResolve(''); // Cleanup on read error
               }
             })();
@@ -212,6 +223,9 @@ export async function getCmdWindowInput(
                   // File not found
                   if (heartbeatFileSeen) {
                     // File existed before but is now gone, assume dead
+                    logger.info(
+                      `Heartbeat file ${heartbeatFilePath} not found. Process likely exited.`,
+                    );
                     void cleanupAndResolve(''); // Mark promise as intentionally ignored
                   } else if (Date.now() - startTime > 7000) {
                     // File never appeared and initial grace period (7s) passed, assume dead
@@ -220,12 +234,12 @@ export async function getCmdWindowInput(
                   // Otherwise, file just hasn't appeared yet, wait longer
                 } else if (error.code !== 'ENOENT') {
                   // Log other errors, but potentially continue?
-                  console.error('Heartbeat check error:', error);
+                  logger.error('Heartbeat check error:', error);
                   void cleanupAndResolve(''); // Resolve immediately on other errors? Marked promise as intentionally ignored
                 }
               } else {
                 // Handle cases where err is not an object with a code property
-                console.error('Unexpected heartbeat check error:', err);
+                logger.error('Unexpected heartbeat check error:', err);
                 void cleanupAndResolve(''); // Mark promise as intentionally ignored
               }
             }
@@ -240,8 +254,10 @@ export async function getCmdWindowInput(
           timeoutSeconds * 1000 + 5000,
         ); // Add a bit more buffer
       } catch (setupError) {
-        console.error('Error during cmd-input setup:', setupError);
-        resolve(''); // Resolve with empty string on setup error
+        logger.error('Error during cmd-input setup:', setupError);
+        // Ensure cleanup happens even if setup fails
+        await cleanupResources(heartbeatFilePath, tempFilePath, sessionId); // Call cleanupResources directly
+        resolve(''); // Resolve with empty string after attempting cleanup
       }
     })(); // Execute the IIFE
   });

@@ -3,98 +3,140 @@ import { render, Box, Text, useApp } from 'ink';
 import { ProgressBar } from '@inkjs/ui';
 import fs from 'fs/promises';
 import path from 'path'; // Import path module
+import os from 'os'; // Import os module for tmpdir
 import logger from '../../utils/logger.js';
 import { InteractiveInput } from '../../components/InteractiveInput.js'; // Import shared component
 
-// Parse command line arguments from a single JSON-encoded argument for safety
-const parseArgs = () => {
-  const args = process.argv.slice(2);
-  const defaults = {
-    prompt: 'Enter your response:',
-    timeout: 30,
-    showCountdown: false as boolean,
-    sessionId: undefined as string | undefined,
-    outputFile: undefined as string | undefined,
-    predefinedOptions: undefined as string[] | undefined,
-  };
-  if (args[0]) {
-    try {
-      // Decode base64-encoded JSON payload to avoid quoting issues
-      const decoded = Buffer.from(args[0], 'base64').toString('utf8');
-      const parsed = JSON.parse(decoded);
-      return { ...defaults, ...parsed };
-    } catch (e) {
-      logger.error(
-        'Invalid input options payload, using defaults.',
-        e instanceof Error ? e.message : e,
-      );
-    }
-  }
-  return defaults;
-};
-
-// Get command line arguments
-const options = parseArgs();
-
-// Function to write response to output file if provided
-const writeResponseToFile = async (response: string) => {
-  if (!options.outputFile) return;
-  // write file in UTF-8 format, errors propagate to caller
-  await fs.writeFile(options.outputFile, response, 'utf8');
-};
-
-// Register process termination handlers at the root level
-// These will fire even if the React component doesn't get a chance to clean up
-const handleExit = () => {
-  if (options.outputFile) {
-    writeResponseToFile('')
-      .then(() => process.exit(0))
-      .catch((error) => {
-        logger.error('Failed to write exit file:', error);
-        process.exit(1);
-      });
-  } else {
-    process.exit(0);
-  }
-};
-
-// Listen for termination signals right at the application root
-process.on('SIGINT', handleExit);
-process.on('SIGTERM', handleExit);
-process.on('beforeExit', handleExit);
-
-interface AppProps {
+interface CmdOptions {
   projectName?: string;
   prompt: string;
   timeout: number;
   showCountdown: boolean;
-  outputFile?: string;
+  sessionId: string; // Should always be present now
+  outputFile: string; // Should always be present now
+  heartbeatFile: string; // Should always be present now
   predefinedOptions?: string[];
 }
 
-const App: FC<AppProps> = ({
-  projectName,
-  prompt,
-  timeout,
-  showCountdown,
-  outputFile,
-  predefinedOptions,
-}) => {
-  // console.clear(); // Clear console before rendering UI - Removed from here
+// Define defaults separately
+const defaultOptions = {
+  prompt: 'Enter your response:',
+  timeout: 30,
+  showCountdown: false,
+  projectName: undefined,
+  predefinedOptions: undefined,
+};
+
+// Function to read options from the file specified by sessionId
+const readOptionsFromFile = async (): Promise<CmdOptions> => {
+  const args = process.argv.slice(2);
+  const sessionId = args[0];
+
+  if (!sessionId) {
+    logger.error('No sessionId provided. Exiting.');
+    throw new Error('No sessionId provided'); // Throw error to prevent proceeding
+  }
+
+  const tempDir = os.tmpdir();
+  const optionsFilePath = path.join(
+    tempDir,
+    `cmd-ui-options-${sessionId}.json`,
+  );
+
+  try {
+    const optionsData = await fs.readFile(optionsFilePath, 'utf8');
+    const parsedOptions = JSON.parse(optionsData) as Partial<CmdOptions>; // Parse as partial
+
+    // Validate required fields after parsing
+    if (
+      !parsedOptions.sessionId ||
+      !parsedOptions.outputFile ||
+      !parsedOptions.heartbeatFile
+    ) {
+      throw new Error('Required options missing in options file.');
+    }
+
+    // Merge defaults with parsed options, ensuring required fields are fully typed
+    return {
+      ...defaultOptions,
+      ...parsedOptions,
+      sessionId: parsedOptions.sessionId, // Ensure these are strings
+      outputFile: parsedOptions.outputFile,
+      heartbeatFile: parsedOptions.heartbeatFile,
+    } as CmdOptions;
+  } catch (error) {
+    logger.error(
+      `Failed to read or parse options file ${optionsFilePath}:`,
+      error instanceof Error ? error.message : error,
+    );
+    // Re-throw to ensure the calling code knows initialization failed
+    throw error;
+  }
+};
+
+// Function to write response to output file if provided
+const writeResponseToFile = async (outputFile: string, response: string) => {
+  if (!outputFile) return;
+  // write file in UTF-8 format, errors propagate to caller
+  await fs.writeFile(outputFile, response, 'utf8');
+};
+
+// Global state for options and exit handler setup
+let options: CmdOptions | null = null;
+let exitHandlerAttached = false;
+
+// Async function to initialize options and setup exit handlers
+async function initialize() {
+  try {
+    options = await readOptionsFromFile();
+    // Setup exit handlers only once after options are successfully read
+    if (!exitHandlerAttached) {
+      const handleExit = () => {
+        if (options && options.outputFile) {
+          // Write empty string to indicate abnormal exit (e.g., Ctrl+C)
+          writeResponseToFile(options.outputFile, '')
+            .catch((error) => {
+              logger.error('Failed to write exit file:', error);
+            })
+            .finally(() => process.exit(0)); // Exit gracefully after attempting write
+        } else {
+          process.exit(0);
+        }
+      };
+
+      process.on('SIGINT', handleExit);
+      process.on('SIGTERM', handleExit);
+      process.on('beforeExit', handleExit); // Catches graceful exits too
+      exitHandlerAttached = true;
+    }
+  } catch (error) {
+    logger.error('Initialization failed:', error);
+    process.exit(1); // Exit if initialization fails
+  }
+}
+
+interface AppProps {
+  options: CmdOptions;
+}
+
+const App: FC<AppProps> = ({ options: appOptions }) => {
   const { exit } = useApp();
+  const {
+    projectName,
+    prompt,
+    timeout,
+    showCountdown,
+    outputFile,
+    heartbeatFile,
+    predefinedOptions,
+  } = appOptions;
+
   const [timeLeft, setTimeLeft] = useState(timeout);
-  const heartbeatFilePath =
-    outputFile && options.sessionId
-      ? path.join(
-          path.dirname(outputFile),
-          `cmd-ui-heartbeat-${options.sessionId}.txt`,
-        )
-      : undefined;
 
   // Clear console only once on mount
   useEffect(() => {
     console.clear();
-  }, []); // Empty dependency array ensures this runs only once
+  }, []);
 
   // Handle countdown and auto-exit on timeout
   useEffect(() => {
@@ -102,12 +144,9 @@ const App: FC<AppProps> = ({
       setTimeLeft((prev) => {
         if (prev <= 1) {
           clearInterval(timer);
-          // Write the timeout indicator string to output file on timeout, then exit
-          writeResponseToFile('__TIMEOUT__')
-            .catch((err) =>
-              logger.error('Failed to write to output file:', err),
-            )
-            .finally(() => exit());
+          writeResponseToFile(outputFile, '__TIMEOUT__') // Use outputFile from props
+            .catch((err) => logger.error('Failed to write timeout file:', err))
+            .finally(() => exit()); // Use Ink's exit for timeout
           return 0;
         }
         return prev - 1;
@@ -116,12 +155,28 @@ const App: FC<AppProps> = ({
 
     // Add heartbeat interval
     let heartbeatInterval: NodeJS.Timeout | undefined;
-    if (heartbeatFilePath) {
+    if (heartbeatFile) {
       heartbeatInterval = setInterval(async () => {
         try {
-          await fs.writeFile(heartbeatFilePath, '', 'utf8'); // Update heartbeat file
-        } catch (_e) {
-          // Ignore errors writing heartbeat file (e.g., if directory is removed)
+          // Touch the file (create if not exists, update mtime if exists)
+          const now = new Date();
+          await fs.utimes(heartbeatFile, now, now);
+        } catch (err: unknown) {
+          // If file doesn't exist, try to create it
+          if (
+            err &&
+            typeof err === 'object' &&
+            'code' in err &&
+            (err as { code: string }).code === 'ENOENT'
+          ) {
+            try {
+              await fs.writeFile(heartbeatFile, '', 'utf8');
+            } catch (createErr) {
+              // Ignore errors creating heartbeat file (e.g., permissions)
+            }
+          } else {
+            // Ignore other errors writing heartbeat file
+          }
         }
       }, 1000); // Update every second
     }
@@ -129,19 +184,19 @@ const App: FC<AppProps> = ({
     return () => {
       clearInterval(timer);
       if (heartbeatInterval) {
-        clearInterval(heartbeatInterval); // Clear heartbeat interval on cleanup
+        clearInterval(heartbeatInterval);
       }
     };
-  }, [exit, heartbeatFilePath]); // Add heartbeatFilePath to dependency array
+  }, [exit, outputFile, heartbeatFile, timeout]); // Added timeout to dependencies
 
   // Handle final submission
   const handleSubmit = (value: string) => {
     logger.debug(`User submitted: ${value}`);
-    writeResponseToFile(value)
-      .then(() => {
-        exit();
-      })
-      .catch((err) => logger.error('Failed to write to output file:', err));
+    writeResponseToFile(outputFile, value) // Use outputFile from props
+      .catch((err) => logger.error('Failed to write response file:', err))
+      .finally(() => {
+        exit(); // Use Ink's exit for normal submission
+      });
   };
 
   // Wrapper for handleSubmit to match the signature of InteractiveInput's onSubmit
@@ -149,8 +204,6 @@ const App: FC<AppProps> = ({
     handleSubmit(value);
   };
 
-  // Calculate progress value for the countdown bar (0 to 100)
-  // Progress decreases as time passes (starts full, ends empty)
   const progressValue = (timeLeft / timeout) * 100;
 
   return (
@@ -160,7 +213,6 @@ const App: FC<AppProps> = ({
       borderStyle="round"
       borderColor="blue"
     >
-      {/* Display Project Name as Title */}
       {projectName && (
         <Box marginBottom={1} justifyContent="center">
           <Text bold color="magenta">
@@ -168,14 +220,12 @@ const App: FC<AppProps> = ({
           </Text>
         </Box>
       )}
-
       <InteractiveInput
-        question={prompt} // Use prompt as the question
-        questionId={prompt} // Use prompt as a dummy ID
+        question={prompt}
+        questionId={prompt}
         predefinedOptions={predefinedOptions}
-        onSubmit={handleInputSubmit} // Use the wrapper function
+        onSubmit={handleInputSubmit}
       />
-
       {showCountdown && (
         <Box flexDirection="column" marginTop={1}>
           <Text color="yellow">Time remaining: {timeLeft}s</Text>
@@ -186,5 +236,18 @@ const App: FC<AppProps> = ({
   );
 };
 
-// Render the app
-render(<App {...options} />);
+// Initialize and render the app
+initialize()
+  .then(() => {
+    if (options) {
+      render(<App options={options} />);
+    } else {
+      // This case should theoretically not be reached due to error handling in initialize
+      logger.error('Options could not be initialized. Cannot render App.');
+      process.exit(1);
+    }
+  })
+  .catch(() => {
+    // Error already logged in initialize or readOptionsFromFile
+    process.exit(1);
+  });

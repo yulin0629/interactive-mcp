@@ -16,11 +16,12 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 async function cleanupResources(
   heartbeatPath: string,
   responsePath: string,
-  sessionId: string,
+  optionsPath: string, // Added optionsPath
 ) {
   await Promise.allSettled([
     fsPromises.unlink(responsePath).catch(() => {}),
     fsPromises.unlink(heartbeatPath).catch(() => {}),
+    fsPromises.unlink(optionsPath).catch(() => {}), // Cleanup options file
     // Potentially add cleanup for other session-related files if needed
   ]);
 }
@@ -49,6 +50,10 @@ export async function getCmdWindowInput(
     tempDir,
     `cmd-ui-heartbeat-${sessionId}.txt`,
   );
+  const optionsFilePath = path.join(
+    tempDir,
+    `cmd-ui-options-${sessionId}.json`,
+  ); // New options file path
 
   return new Promise<string>((resolve) => {
     // Wrap the async setup logic in an IIFE
@@ -56,7 +61,7 @@ export async function getCmdWindowInput(
       // Path to the UI script (will be in the same directory after compilation)
       const uiScriptPath = path.join(__dirname, 'ui.js');
 
-      // Spawn a new process to run the UI in a detached window, passing all options as a single JSON argument to prevent injection
+      // Gather options
       const options = {
         projectName,
         prompt: promptMessage,
@@ -64,43 +69,41 @@ export async function getCmdWindowInput(
         showCountdown,
         sessionId,
         outputFile: tempFilePath,
+        heartbeatFile: heartbeatFilePath, // Pass heartbeat file path too
         predefinedOptions,
       };
 
-      // Encode options as base64 payload to avoid quoting issues on Windows
-      const payload = Buffer.from(JSON.stringify(options)).toString('base64');
       let ui;
 
       // Moved setup into try block
       try {
+        // Write options to the file before spawning
+        await fsPromises.writeFile(
+          optionsFilePath,
+          JSON.stringify(options),
+          'utf8',
+        );
+
         // Platform-specific spawning
         const platform = os.platform();
 
         if (platform === 'darwin') {
           // macOS
-          // Escape potential special characters in paths/payload for the shell command
-          // For the shell command executed by 'do script', we primarily need to handle spaces
-          // or other characters that might break the command if paths aren't quoted.
-          // The `${...}` interpolation within backticks handles basic variable insertion.
-          // Quoting the paths within nodeCommand handles spaces.
-          const escapedScriptPath = uiScriptPath; // Keep original path, rely on quotes below
-          const escapedPayload = payload; // Keep original payload, rely on quotes below
+          const escapedScriptPath = uiScriptPath;
+          const escapedSessionId = sessionId; // Only need sessionId now
 
           // Construct the command string directly for the shell. Quotes handle paths with spaces.
-          const nodeCommand = `exec node "${escapedScriptPath}" "${escapedPayload}"; exit 0`;
+          // Pass only the sessionId
+          const nodeCommand = `exec node "${escapedScriptPath}" "${escapedSessionId}"; exit 0`;
 
           // Escape the node command for osascript's AppleScript string:
-          // 1. Escape existing backslashes (\ -> \\)
-          // 2. Escape double quotes (" -> \")
           const escapedNodeCommand = nodeCommand
-            // Escape backslashes first
-            .replace(/\\/g, '\\')
-            // Then escape double quotes
-            .replace(/"/g, '\\"');
+            .replace(/\\/g, '\\\\') // Escape backslashes
+            .replace(/"/g, '\\"'); // Escape double quotes
 
           // Activate Terminal first, then do script with exec
           const command = `osascript -e 'tell application "Terminal" to activate' -e 'tell application "Terminal" to do script "${escapedNodeCommand}"'`;
-          const commandArgs: string[] = []; // No args needed when command is a single string for shell
+          const commandArgs: string[] = [];
 
           ui = spawn(command, commandArgs, {
             stdio: ['ignore', 'ignore', 'ignore'],
@@ -109,17 +112,17 @@ export async function getCmdWindowInput(
           });
         } else if (platform === 'win32') {
           // Windows
-
-          ui = spawn('node', [uiScriptPath, payload], {
+          // Pass only the sessionId
+          ui = spawn('node', [uiScriptPath, sessionId], {
             stdio: ['ignore', 'ignore', 'ignore'],
             shell: true,
             detached: true,
             windowsHide: false,
           });
         } else {
-          // Linux or other - use original method (might not pop up window)
-
-          ui = spawn('node', [uiScriptPath, payload], {
+          // Linux or other
+          // Pass only the sessionId
+          ui = spawn('node', [uiScriptPath, sessionId], {
             stdio: ['ignore', 'ignore', 'ignore'],
             shell: true,
             detached: true,
@@ -139,15 +142,20 @@ export async function getCmdWindowInput(
             heartbeatInterval = null;
           }
           if (watcher) {
-            watcher.close(); // Ensure watcher is closed
-            watcher = null; // Nullify watcher after closing
+            watcher.close();
+            watcher = null;
           }
           if (timeoutHandle) {
-            clearTimeout(timeoutHandle); // Ensure timeout is cleared
-            timeoutHandle = null; // Nullify timeout handle
+            clearTimeout(timeoutHandle);
+            timeoutHandle = null;
           }
 
-          await cleanupResources(heartbeatFilePath, tempFilePath, sessionId);
+          // Pass optionsFilePath to cleanupResources
+          await cleanupResources(
+            heartbeatFilePath,
+            tempFilePath,
+            optionsFilePath,
+          );
 
           resolve(response);
         };
@@ -210,6 +218,9 @@ export async function getCmdWindowInput(
               const now = Date.now();
               // If file hasn't been modified in the last 3 seconds, assume dead
               if (now - stats.mtime.getTime() > 3000) {
+                logger.info(
+                  `Heartbeat file ${heartbeatFilePath} hasn't been updated recently. Process likely exited.`, // Added logger info
+                );
                 void cleanupAndResolve(''); // Mark promise as intentionally ignored
               } else {
                 heartbeatFileSeen = true; // Mark that we've seen the file
@@ -224,16 +235,20 @@ export async function getCmdWindowInput(
                   if (heartbeatFileSeen) {
                     // File existed before but is now gone, assume dead
                     logger.info(
-                      `Heartbeat file ${heartbeatFilePath} not found. Process likely exited.`,
+                      `Heartbeat file ${heartbeatFilePath} not found after being seen. Process likely exited.`, // Added logger info
                     );
                     void cleanupAndResolve(''); // Mark promise as intentionally ignored
                   } else if (Date.now() - startTime > 7000) {
                     // File never appeared and initial grace period (7s) passed, assume dead
+                    logger.info(
+                      `Heartbeat file ${heartbeatFilePath} never appeared. Process likely failed to start.`, // Added logger info
+                    );
                     void cleanupAndResolve(''); // Mark promise as intentionally ignored
                   }
                   // Otherwise, file just hasn't appeared yet, wait longer
-                } else if (error.code !== 'ENOENT') {
-                  // Log other errors, but potentially continue?
+                } else {
+                  // Removed check for !== 'ENOENT' as it's implied
+                  // Log other errors and resolve
                   logger.error('Heartbeat check error:', error);
                   void cleanupAndResolve(''); // Resolve immediately on other errors? Marked promise as intentionally ignored
                 }
@@ -249,6 +264,9 @@ export async function getCmdWindowInput(
         // Timeout to stop watching if no response within limit
         timeoutHandle = setTimeout(
           () => {
+            logger.info(
+              `Input timeout reached after ${timeoutSeconds} seconds.`,
+            ); // Added logger info
             void cleanupAndResolve(''); // Mark promise as intentionally ignored
           },
           timeoutSeconds * 1000 + 5000,
@@ -256,7 +274,12 @@ export async function getCmdWindowInput(
       } catch (setupError) {
         logger.error('Error during cmd-input setup:', setupError);
         // Ensure cleanup happens even if setup fails
-        await cleanupResources(heartbeatFilePath, tempFilePath, sessionId); // Call cleanupResources directly
+        // Pass optionsFilePath to cleanupResources
+        await cleanupResources(
+          heartbeatFilePath,
+          tempFilePath,
+          optionsFilePath,
+        );
         resolve(''); // Resolve with empty string after attempting cleanup
       }
     })(); // Execute the IIFE

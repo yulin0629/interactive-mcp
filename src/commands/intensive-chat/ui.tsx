@@ -104,7 +104,7 @@ interface AppProps {
 }
 
 const App: FC<AppProps> = ({ sessionId, title, outputDir, timeoutSeconds }) => {
-  console.clear(); // Clear console before rendering UI
+  // console.clear(); // Clear console before rendering UI - Removed from here
   const { exit: appExit } = useApp();
   const [chatHistory, setChatHistory] = useState<ChatMessage[]>([]);
   const [currentQuestionId, setCurrentQuestionId] = useState<string | null>(
@@ -115,6 +115,11 @@ const App: FC<AppProps> = ({ sessionId, title, outputDir, timeoutSeconds }) => {
   >(undefined);
   const [timeLeft, setTimeLeft] = useState<number | null>(null); // State for countdown timer
   const timerRef = useRef<NodeJS.Timeout | null>(null); // Ref to hold timer ID
+
+  // Clear console only once on mount
+  useEffect(() => {
+    console.clear();
+  }, []); // Empty dependency array ensures this runs only once
 
   // Check for new questions periodically
   useEffect(() => {

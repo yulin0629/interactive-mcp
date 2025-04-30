@@ -80,7 +80,7 @@ const App: FC<AppProps> = ({
   outputFile,
   predefinedOptions,
 }) => {
-  console.clear(); // Clear console before rendering UI
+  // console.clear(); // Clear console before rendering UI - Removed from here
   const { exit } = useApp();
   const [timeLeft, setTimeLeft] = useState(timeout);
   const heartbeatFilePath =
@@ -90,6 +90,11 @@ const App: FC<AppProps> = ({
           `cmd-ui-heartbeat-${options.sessionId}.txt`,
         )
       : undefined;
+
+  // Clear console only once on mount
+  useEffect(() => {
+    console.clear();
+  }, []); // Empty dependency array ensures this runs only once
 
   // Handle countdown and auto-exit on timeout
   useEffect(() => {

@@ -7,8 +7,9 @@ import {
 } from 'pino';
 import path from 'path';
 import fs from 'fs';
+import os from 'os';
 
-const logDir = path.resolve(process.cwd(), 'logs');
+const logDir = path.resolve(os.tmpdir(), 'interactive-mcp-logs');
 const logFile = path.join(logDir, 'dev.log');
 
 // Ensure log directory exists

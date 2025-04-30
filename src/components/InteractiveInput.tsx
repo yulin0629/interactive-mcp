@@ -1,5 +1,7 @@
 import React, { FC, useState, useEffect } from 'react';
 import { Box, Text, useInput } from 'ink';
+import { TextInput } from '@inkjs/ui';
+import logger from '@/utils/logger.js';
 
 interface InteractiveInputProps {
   question: string;
@@ -11,100 +13,83 @@ interface InteractiveInputProps {
 export const InteractiveInput: FC<InteractiveInputProps> = ({
   question,
   questionId,
-  predefinedOptions,
+  predefinedOptions = [],
   onSubmit,
 }) => {
-  const [mode, setMode] = useState<'option' | 'custom'>('option');
-  const [selectedIndex, setSelectedIndex] = useState(0);
-  const [customValue, setCustomValue] = useState('');
-  const [cursorPosition, setCursorPosition] = useState(0);
-  // Get the character under cursor, if any
-  const charUnderCursor = customValue[cursorPosition] || null;
+  const [mode, setMode] = useState<'option' | 'input'>(
+    predefinedOptions.length > 0 ? 'option' : 'input',
+  );
+  const [selectedIndex, setSelectedIndex] = useState<number>(0);
+  const [inputValue, setInputValue] = useState<string>('');
 
-  // If there are no predefined options, default to custom input mode
-  useEffect(() => {
-    if (!predefinedOptions || predefinedOptions.length === 0) {
-      setMode('custom');
-    }
-  }, [predefinedOptions]);
-
-  // Capture key presses
   useInput((input, key) => {
-    if ((key.upArrow || key.downArrow) && predefinedOptions?.length) {
-      // cycle selection among predefined options
-      setSelectedIndex((prev) => {
-        if (key.upArrow) {
-          return prev > 0 ? prev - 1 : predefinedOptions.length - 1;
-        } else {
-          return prev < predefinedOptions.length - 1 ? prev + 1 : 0;
-        }
-      });
-      setMode('option');
-    } else if (key.leftArrow) {
-      if (mode === 'custom') {
-        // Move cursor left if possible
-        setCursorPosition((prev) => Math.max(0, prev - 1));
-      } else {
-        // If in option mode, just switch to custom mode but keep cursor at 0
-        setMode('custom');
-        setCursorPosition(0);
-      }
-    } else if (key.rightArrow) {
-      if (mode === 'custom') {
-        // Move cursor right if possible
-        setCursorPosition((prev) => Math.min(customValue.length, prev + 1));
-      } else {
-        // If in option mode, switch to custom mode with cursor at end of text
-        setMode('custom');
-        setCursorPosition(customValue.length);
-      }
-    } else if (key.return) {
-      let valueToSubmit: string;
-
-      // Prioritize selected option if options exist and custom input is empty
-      if (
-        predefinedOptions &&
-        predefinedOptions.length > 0 &&
-        customValue === ''
-      ) {
-        valueToSubmit = predefinedOptions[selectedIndex] || '';
-      } else {
-        // Otherwise, prioritize custom input, falling back to selected option if custom is empty
-        valueToSubmit =
-          customValue ||
-          (predefinedOptions && predefinedOptions[selectedIndex]) ||
-          '';
+    if (predefinedOptions.length > 0) {
+      if (key.upArrow) {
+        setMode('option');
+        setSelectedIndex((prev) => Math.max(0, prev - 1));
+        return;
       }
 
-      onSubmit(questionId, valueToSubmit);
-    } else if (key.backspace || key.delete) {
-      if (mode === 'custom') {
-        if (key.delete && cursorPosition < customValue.length) {
-          // Delete: remove character at cursor position
-          setCustomValue(
-            (prev) =>
-              prev.slice(0, cursorPosition) + prev.slice(cursorPosition + 1),
-          );
-        } else if (key.backspace && cursorPosition > 0) {
-          // Backspace: remove character before cursor and move cursor left
-          setCustomValue(
-            (prev) =>
-              prev.slice(0, cursorPosition - 1) + prev.slice(cursorPosition),
-          );
-          setCursorPosition((prev) => prev - 1);
-        }
+      if (key.downArrow) {
+        setMode('option');
+        setSelectedIndex((prev) =>
+          Math.min(predefinedOptions.length - 1, prev + 1),
+        );
+        return;
       }
-    } else if (input && input.length === 1 && !key.ctrl && !key.meta) {
-      // Any other key appends to custom input
-      setMode('custom');
-      // Insert at cursor position instead of appending
-      setCustomValue(
-        (prev) =>
-          prev.slice(0, cursorPosition) + input + prev.slice(cursorPosition),
-      );
-      setCursorPosition((prev) => prev + 1);
+    }
+
+    if (key.return) {
+      if (mode === 'option' && predefinedOptions.length > 0) {
+        onSubmit(questionId, predefinedOptions[selectedIndex]);
+      } else {
+        onSubmit(questionId, inputValue);
+      }
+      return;
+    }
+
+    // Any other key press switches to input mode
+    if (
+      !key.ctrl &&
+      !key.meta &&
+      !key.escape &&
+      !key.tab &&
+      !key.shift &&
+      !key.leftArrow &&
+      !key.rightArrow &&
+      input
+    ) {
+      setMode('input');
+      // Update inputValue only if switching to input mode via typing
+      // TextInput's onChange will handle subsequent typing
+      if (mode === 'option') {
+        setInputValue(input); // Start input with the typed character
+      }
     }
   });
+
+  const handleInputChange = (value: string) => {
+    if (value !== inputValue) {
+      setInputValue(value);
+      // If user starts typing, switch to input mode
+      if (value.length > 0 && mode === 'option') {
+        setMode('input');
+      } else if (value.length === 0 && predefinedOptions.length > 0) {
+        // Optionally switch back to option mode if input is cleared
+        // setMode('option');
+      }
+    }
+  };
+
+  const handleSubmit = (value: string) => {
+    // The primary submit logic is now handled in useInput via Enter key
+    // This might still be called by TextInput's internal onSubmit, ensure consistency
+    if (mode === 'option' && predefinedOptions.length > 0) {
+      onSubmit(questionId, predefinedOptions[selectedIndex]);
+    } else {
+      onSubmit(questionId, value); // Use the value from TextInput in case it triggered submit
+    }
+  };
 
   return (
     <>
@@ -114,68 +99,40 @@ export const InteractiveInput: FC<InteractiveInputProps> = ({
         </Text>
       </Box>
 
-      {predefinedOptions && predefinedOptions.length > 0 && (
+      {predefinedOptions.length > 0 && (
         <Box flexDirection="column" marginBottom={1}>
           <Text dimColor={true}>
-            Use ↑/↓ to select options, Enter to submit
+            Use ↑/↓ to select options, type for custom input, Enter to submit
           </Text>
           {predefinedOptions.map((opt, i) => (
             <Text
               key={i}
               color={
-                i === selectedIndex
-                  ? mode === 'option'
-                    ? 'greenBright'
-                    : 'green'
+                i === selectedIndex && mode === 'option'
+                  ? 'greenBright'
                   : undefined
               }
             >
-              {i === selectedIndex ? (mode === 'option' ? '› ' : '  ') : '  '}
+              {i === selectedIndex && mode === 'option' ? '› ' : '  '}
               {opt}
             </Text>
           ))}
         </Box>
       )}
 
-      {/* Custom input line with cursor */}
-      <Box marginBottom={1}>
-        <Box>
-          <Text
-            color={
-              customValue.length > 0 || mode === 'custom'
-                ? mode === 'custom'
-                  ? 'greenBright'
-                  : 'green'
-                : undefined
+      <Box>
+        <Text color={mode === 'input' ? 'greenBright' : undefined}>
+          {mode === 'input' ? '✎ ' : '› '}
+          <TextInput
+            placeholder={
+              predefinedOptions.length > 0
+                ? 'Type or select an option...'
+                : 'Type your answer...'
             }
-          >
-            {customValue.length > 0 && mode === 'custom' ? '✎ ' : '  '}
-            {/* Only show "Custom: " label when there are predefined options */}
-            {predefinedOptions && predefinedOptions.length > 0
-              ? 'Custom: '
-              : ''}
-            {customValue.slice(0, cursorPosition)}
-          </Text>
-          {/* Cursor with highlighted character underneath */}
-          {charUnderCursor ? (
-            <Text backgroundColor="green" color="black">
-              {charUnderCursor}
-            </Text>
-          ) : (
-            <Text color={mode === 'custom' ? 'green' : undefined}>█</Text>
-          )}
-          <Text
-            color={
-              customValue.length > 0 || mode === 'custom'
-                ? mode === 'custom'
-                  ? 'greenBright'
-                  : 'green'
-                : undefined
-            }
-          >
-            {customValue.slice(cursorPosition + 1)}
-          </Text>
-        </Box>
+            onChange={handleInputChange}
+            onSubmit={handleSubmit}
+          />
+        </Text>
       </Box>
     </>
   );

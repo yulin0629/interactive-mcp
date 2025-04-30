@@ -1,6 +1,6 @@
 # interactive-mcp
 
-[![npm version](https://img.shields.io/npm/v/interactive-mcp)](https://www.npmjs.com/package/interactive-mcp) [![npm downloads](https://img.shields.io/npm/dm/interactive-mcp)](https://www.npmjs.com/package/interactive-mcp) [![GitHub license](https://img.shields.io/github/license/ttommyth/interactive-mcp)](https://github.com/ttommyth/interactive-mcp/blob/main/LICENSE) [![code style: prettier](https://img.shields.io/badge/code_style-prettier-ff69b4.svg?style=flat-square)](https://github.com/prettier/prettier) [![Platforms](https://img.shields.io/badge/Platform-Windows%20%7C%20macOS%20%7C%20Linux-blue)](https://github.com/ttommyth/interactive-mcp) [![GitHub last commit](https://img.shields.io/github/last-commit/ttommyth/interactive-mcp)](https://github.com/ttommyth/interactive-mcp/commits/main)
+[![npm version](https://img.shields.io/npm/v/interactive-mcp)](https://www.npmjs.com/package/interactive-mcp) [![npm downloads](https://img.shields.io/npm/dm/interactive-mcp)](https://www.npmjs.com/package/interactive-mcp) [![smithery badge](https://smithery.ai/badge/@ttommyth/interactive-mcp)](https://smithery.ai/server/@ttommyth/interactive-mcp) [![GitHub license](https://img.shields.io/github/license/ttommyth/interactive-mcp)](https://github.com/ttommyth/interactive-mcp/blob/main/LICENSE) [![code style: prettier](https://img.shields.io/badge/code_style-prettier-ff69b4.svg?style=flat-square)](https://github.com/prettier/prettier) [![Platforms](https://img.shields.io/badge/Platform-Windows%20%7C%20macOS%20%7C%20Linux-blue)](https://github.com/ttommyth/interactive-mcp) [![GitHub last commit](https://img.shields.io/github/last-commit/ttommyth/interactive-mcp)](https://github.com/ttommyth/interactive-mcp/commits/main)
 
 <div align="center">
 <a href="https://glama.ai/mcp/servers/@ttommyth/interactive-mcp">
@@ -53,7 +53,7 @@ This server is ideal for scenarios where an LLM needs to interact directly with 
 
 This section explains how to configure MCP clients to use the `interactive-mcp` server.
 
-By default, user prompts will time out after 30 seconds. You can customize server options like timeout or disabled tools by adding command-line flags to the `args` array after `"--"` when configuring your client.
+By default, user prompts will time out after 30 seconds. You can customize server options like timeout or disabled tools by adding command-line flags directly to the `args` array when configuring your client.
 
 Please make sure you have the `npx` command available.
 
@@ -72,14 +72,14 @@ Add the following minimal configuration to your `claude_desktop_config.json` (Cl
 }
 ```
 
-**Example with Custom Timeout (60s):**
+**Example with Custom Timeout (30s):**
 
 ```json
 {
   "mcpServers": {
     "interactive": {
       "command": "npx",
-      "args": ["-y", "interactive-mcp", "--", "-t", "60"]
+      "args": ["-y", "interactive-mcp", "-t", "30"]
     }
   }
 }
@@ -141,7 +141,7 @@ pnpm start
 
 #### Command-Line Options
 
-The `interactive-mcp` server accepts the following command-line options. These should typically be configured in your MCP client's JSON settings by adding them to the `args` array after a `"--"` separator (see "Client Configuration" examples).
+The `interactive-mcp` server accepts the following command-line options. These should typically be configured in your MCP client's JSON settings by adding them directly to the `args` array (see "Client Configuration" examples).
 
 | Option            | Alias | Description                                                                                                                                                                                           |
 | ----------------- | ----- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -152,11 +152,11 @@ The `interactive-mcp` server accepts the following command-line options. These s
 
 ```jsonc
 // Example combining options in client config's "args":
-// ... (other args like "-y", "interactive-mcp")
-"--", // Separator for server arguments
-"-t", "90", // Set timeout to 90 seconds
-"--disable-tools", "message_complete_notification,intensive_chat" // Disable notifications and intensive chat
-// ...
+"args": [
+  "-y", "interactive-mcp",
+  "-t", "30", // Set timeout to 30 seconds
+  "--disable-tools", "message_complete_notification,intensive_chat" // Disable notifications and intensive chat
+]
 ```
 
 ## Development Commands

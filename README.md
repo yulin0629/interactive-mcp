@@ -72,6 +72,19 @@ Add the following minimal configuration to your `claude_desktop_config.json` (Cl
 }
 ```
 
+**With specific version**
+
+```json
+{
+  "mcpServers": {
+    "interactive": {
+      "command": "npx",
+      "args": ["-y", "interactive-mcp@1.9.0"]
+    }
+  }
+}
+```
+
 **Example with Custom Timeout (30s):**
 
 ```json

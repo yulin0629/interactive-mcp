@@ -2,11 +2,7 @@
 
 [![npm version](https://img.shields.io/npm/v/interactive-mcp)](https://www.npmjs.com/package/interactive-mcp) [![npm downloads](https://img.shields.io/npm/dm/interactive-mcp)](https://www.npmjs.com/package/interactive-mcp) [![smithery badge](https://smithery.ai/badge/@ttommyth/interactive-mcp)](https://smithery.ai/server/@ttommyth/interactive-mcp) [![GitHub license](https://img.shields.io/github/license/ttommyth/interactive-mcp)](https://github.com/ttommyth/interactive-mcp/blob/main/LICENSE) [![code style: prettier](https://img.shields.io/badge/code_style-prettier-ff69b4.svg?style=flat-square)](https://github.com/prettier/prettier) [![Platforms](https://img.shields.io/badge/Platform-Windows%20%7C%20macOS%20%7C%20Linux-blue)](https://github.com/ttommyth/interactive-mcp) [![GitHub last commit](https://img.shields.io/github/last-commit/ttommyth/interactive-mcp)](https://github.com/ttommyth/interactive-mcp/commits/main)
 
-<div align="center">
-<a href="https://glama.ai/mcp/servers/@ttommyth/interactive-mcp">
-  <img width="380" height="200" src="https://glama.ai/mcp/servers/@ttommyth/interactive-mcp/badge" alt="interactive-mcp MCP server" />
-</a>
-</div>
+![Screenshot 2025-05-13 213745](https://github.com/user-attachments/assets/40208534-5910-4eb2-bfbc-58f7d93aec95)
 
 A MCP Server implemented in Node.js/TypeScript, facilitating interactive communication between LLMs and users. **Note:** This server is designed to run locally alongside the MCP client (e.g., Claude Desktop, VS Code), as it needs direct access to the user's operating system to display notifications and command-line prompts.
 
@@ -14,9 +10,13 @@ _(Note: This project is in its early stages.)_
 
 **Want a quick overview?** Check out the introductory blog post: [Stop Your AI Assistant From Guessing — Introducing interactive-mcp](https://medium.com/@ttommyth/stop-your-ai-assistant-from-guessing-introducing-interactive-mcp-b42ac6d9b0e2)
 
-|                                                   Demo Video                                                    |
-| :-------------------------------------------------------------------------------------------------------------: |
-| [![Interactive Demo Video](https://img.youtube.com/vi/ebwDZdfgSHo/hqdefault.jpg)](https://youtu.be/ebwDZdfgSHo) |
+[Demo Video](https://youtu.be/ebwDZdfgSHo)
+
+<div align="center">
+<a href="https://glama.ai/mcp/servers/@ttommyth/interactive-mcp">
+  <img width="380" height="200" src="https://glama.ai/mcp/servers/@ttommyth/interactive-mcp/badge" alt="interactive-mcp MCP server" />
+</a>
+</div>
 
 ## Tools
 

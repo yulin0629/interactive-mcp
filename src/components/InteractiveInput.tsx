@@ -1,4 +1,4 @@
-import React, { FC, useState, useEffect } from 'react';
+import React, { FC, useState, useEffect, useRef } from 'react';
 import { Box, Text, useInput } from 'ink';
 import { TextInput } from '@inkjs/ui';
 import logger from '@/utils/logger.js';
@@ -8,6 +8,8 @@ interface InteractiveInputProps {
   questionId: string;
   predefinedOptions?: string[];
   onSubmit: (questionId: string, value: string) => void;
+  onInteractionStart?: () => void;
+  onInteractionEnd?: () => void;
 }
 
 export const InteractiveInput: FC<InteractiveInputProps> = ({
@@ -15,14 +17,46 @@ export const InteractiveInput: FC<InteractiveInputProps> = ({
   questionId,
   predefinedOptions = [],
   onSubmit,
+  onInteractionStart,
+  onInteractionEnd,
 }) => {
   const [mode, setMode] = useState<'option' | 'input'>(
     predefinedOptions.length > 0 ? 'option' : 'input',
   );
   const [selectedIndex, setSelectedIndex] = useState<number>(0);
   const [inputValue, setInputValue] = useState<string>('');
+  const interactionTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Helper function to handle interaction timing
+  const handleInteraction = () => {
+    // Clear any existing timeout
+    if (interactionTimeoutRef.current) {
+      clearTimeout(interactionTimeoutRef.current);
+    }
+    
+    // Notify parent that interaction started
+    onInteractionStart?.();
+    
+    // Set a new timeout to resume after 2 seconds of inactivity
+    const timeout = setTimeout(() => {
+      onInteractionEnd?.();
+    }, 2000);
+    
+    interactionTimeoutRef.current = timeout;
+  };
+
+  // Cleanup timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (interactionTimeoutRef.current) {
+        clearTimeout(interactionTimeoutRef.current);
+      }
+    };
+  }, []); // Empty dependency array - only run on mount/unmount
 
   useInput((input, key) => {
+    // Any key press counts as interaction
+    handleInteraction();
     if (predefinedOptions.length > 0) {
       if (key.upArrow) {
         setMode('option');
@@ -70,6 +104,9 @@ export const InteractiveInput: FC<InteractiveInputProps> = ({
   });
 
   const handleInputChange = (value: string) => {
+    // Text input change also counts as interaction
+    handleInteraction();
+    
     if (value !== inputValue) {
       setInputValue(value);
       // If user starts typing, switch to input mode

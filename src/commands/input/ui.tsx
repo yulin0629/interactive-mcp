@@ -132,6 +132,7 @@ const App: FC<AppProps> = ({ options: appOptions }) => {
   } = appOptions;
 
   const [timeLeft, setTimeLeft] = useState(timeout);
+  const [isPaused, setIsPaused] = useState(false);
 
   // Clear console only once on mount
   useEffect(() => {
@@ -141,16 +142,18 @@ const App: FC<AppProps> = ({ options: appOptions }) => {
   // Handle countdown and auto-exit on timeout
   useEffect(() => {
     const timer = setInterval(() => {
-      setTimeLeft((prev) => {
-        if (prev <= 1) {
-          clearInterval(timer);
-          writeResponseToFile(outputFile, '__TIMEOUT__') // Use outputFile from props
-            .catch((err) => logger.error('Failed to write timeout file:', err))
-            .finally(() => exit()); // Use Ink's exit for timeout
-          return 0;
-        }
-        return prev - 1;
-      });
+      if (!isPaused) {
+        setTimeLeft((prev) => {
+          if (prev <= 1) {
+            clearInterval(timer);
+            writeResponseToFile(outputFile, '__TIMEOUT__') // Use outputFile from props
+              .catch((err) => logger.error('Failed to write timeout file:', err))
+              .finally(() => exit()); // Use Ink's exit for timeout
+            return 0;
+          }
+          return prev - 1;
+        });
+      }
     }, 1000);
 
     // Add heartbeat interval
@@ -187,7 +190,7 @@ const App: FC<AppProps> = ({ options: appOptions }) => {
         clearInterval(heartbeatInterval);
       }
     };
-  }, [exit, outputFile, heartbeatFile, timeout]); // Added timeout to dependencies
+  }, [exit, outputFile, heartbeatFile, timeout, isPaused]); // Added timeout and isPaused to dependencies
 
   // Handle final submission
   const handleSubmit = (value: string) => {
@@ -202,6 +205,15 @@ const App: FC<AppProps> = ({ options: appOptions }) => {
   // Wrapper for handleSubmit to match the signature of InteractiveInput's onSubmit
   const handleInputSubmit = (_questionId: string, value: string) => {
     handleSubmit(value);
+  };
+
+  // Callbacks for pausing/resuming timer when user interacts
+  const handleUserInteraction = () => {
+    setIsPaused(true);
+  };
+
+  const handleUserStopInteraction = () => {
+    setIsPaused(false);
   };
 
   const progressValue = (timeLeft / timeout) * 100;
@@ -225,10 +237,14 @@ const App: FC<AppProps> = ({ options: appOptions }) => {
         questionId={prompt}
         predefinedOptions={predefinedOptions}
         onSubmit={handleInputSubmit}
+        onInteractionStart={handleUserInteraction}
+        onInteractionEnd={handleUserStopInteraction}
       />
       {showCountdown && (
         <Box flexDirection="column" marginTop={1}>
-          <Text color="yellow">Time remaining: {timeLeft}s</Text>
+          <Text color="yellow">
+            Time remaining: {timeLeft}s {isPaused && '(Paused)'}
+          </Text>
           <ProgressBar value={progressValue} />
         </Box>
       )}

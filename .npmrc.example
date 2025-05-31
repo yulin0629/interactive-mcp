@@ -1,5 +1,0 @@
-# This tells npm where to find @yulin0629 packages
-@yulin0629:registry=https://npm.pkg.github.com
-
-# Users need to add their own token:
-# //npm.pkg.github.com/:_authToken=YOUR_GITHUB_TOKEN

@@ -1,14 +1,11 @@
 {
   "name": "@yulin0629/interactive-mcp",
-  "version": "1.0.0",
+  "version": "1.0.3",
   "main": "dist/index.js",
   "type": "module",
-  "publishConfig": {
-    "registry": "https://npm.pkg.github.com"
-  },
   "repository": {
     "type": "git",
-    "url": "https://github.com/yulin0629/interactive-mcp.git"
+    "url": "git+https://github.com/yulin0629/interactive-mcp.git"
   },
   "bin": {
     "interactive-mcp": "dist/index.js"

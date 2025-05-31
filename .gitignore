@@ -9,3 +9,6 @@ localtestscript/
 
 # Log files
 logs/
+
+# Never commit npm auth tokens!
+.npmrc

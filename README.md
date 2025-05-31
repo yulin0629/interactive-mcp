@@ -7,7 +7,10 @@
 >
 > ## Installation
 > ```bash
-> # Using GitHub Packages
+> # First, configure npm to use GitHub Packages for @yulin0629
+> echo "@yulin0629:registry=https://npm.pkg.github.com" >> ~/.npmrc
+> 
+> # Then use with npx
 > npx @yulin0629/interactive-mcp
 > 
 > # Or configure in Claude MCP

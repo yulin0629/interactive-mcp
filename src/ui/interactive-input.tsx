@@ -1,6 +1,7 @@
 import React, { FC, useState, useEffect } from 'react';
 import { Box, Text } from 'ink';
 import { useInput } from 'ink';
+import logger from '@/utils/logger.js';
 
 // Interface for shared input component props
 export interface InteractiveInputProps {
@@ -37,6 +38,20 @@ export const InteractiveInput: FC<InteractiveInputProps> = ({
 
   // Capture key presses
   useInput((input, key) => {
+    // Ignore input method switching events to prevent Terminal conflicts
+    // These are system events that shouldn't trigger UI changes
+    if (key.ctrl && input === ' ') {
+      // Common input method switch combination (Ctrl+Space)
+      // Don't process to avoid interfering with system input method switching
+      return;
+    }
+
+    // Handle Cmd+Space on macOS (Spotlight/Input method switch)
+    if (key.meta && input === ' ') {
+      // Let the system handle this, don't interfere
+      return;
+    }
+
     if ((key.upArrow || key.downArrow) && predefinedOptions?.length) {
       // cycle selection among predefined options
       setSelectedIndex((prev) => {

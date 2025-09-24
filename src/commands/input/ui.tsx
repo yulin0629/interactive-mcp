@@ -154,7 +154,9 @@ const App: FC<AppProps> = ({ options: appOptions }) => {
           if (prev <= 1) {
             clearInterval(timer);
             writeResponseToFile(outputFile, '__TIMEOUT__') // Use outputFile from props
-              .catch((err) => logger.error('Failed to write timeout file:', err))
+              .catch((err) =>
+                logger.error('Failed to write timeout file:', err),
+              )
               .finally(() => exit()); // Use Ink's exit for timeout
             return 0;
           }

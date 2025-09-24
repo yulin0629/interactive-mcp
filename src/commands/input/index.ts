@@ -1,4 +1,4 @@
-import { spawn } from 'child_process';
+import { spawn, ChildProcess } from 'child_process';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import fsPromises from 'fs/promises';
@@ -88,59 +88,128 @@ export async function getCmdWindowInput(
         const platform = os.platform();
 
         if (platform === 'darwin') {
-          // macOS
+          // macOS - Use safer terminal launch approach to avoid input method conflicts
           const escapedScriptPath = uiScriptPath;
           const escapedSessionId = sessionId; // Only need sessionId now
-
-          // Construct the command string directly for the shell. Quotes handle paths with spaces.
-          // Pass only the sessionId
           const nodeBin = process.execPath;
-          const nodeCommand = `exec "${nodeBin}" "${escapedScriptPath}" "${escapedSessionId}" "${tempDir}"; exit 0`;
 
-          // Escape the node command for osascript's AppleScript string:
-          const escapedNodeCommand = nodeCommand
-            .replace(/\\/g, '\\\\') // Escape backslashes
-            .replace(/"/g, '\\"'); // Escape double quotes
-
-          // Activate Terminal first, then do script with exec
-          const command = `osascript -e 'tell application "Terminal" to activate' -e 'tell application "Terminal" to do script "${escapedNodeCommand}"'`;
-          const commandArgs: string[] = [];
-
-          // Fallback launcher using .command + open -a Terminal (handles Automation issues)
-          const launchViaOpenCommand = async () => {
+          // Primary: Try iTerm2 first (better input method support)
+          const launchViaITerm = async (): Promise<ChildProcess | null> => {
             try {
-              const launcherPath = path.join(
-                tempDir,
-                `interactive-mcp-launch-${sessionId}.command`,
-              );
-              const scriptContent = `#!/bin/bash\nexec "${nodeBin}" "${escapedScriptPath}" "${escapedSessionId}" "${tempDir}"\n`;
-              await fsPromises.writeFile(launcherPath, scriptContent, 'utf8');
-              await fsPromises.chmod(launcherPath, 0o755);
-              const openProc = spawn('open', ['-a', 'Terminal', launcherPath], {
-                stdio: ['ignore', 'ignore', 'ignore'],
-                detached: true,
+              // Check if iTerm2 is available
+              const itermCheck = spawn('osascript', [
+                '-e',
+                'tell application "System Events" to exists application process "iTerm2"',
+              ]);
+
+              const itermAvailable = await new Promise<boolean>((resolve) => {
+                let output = '';
+                itermCheck.stdout?.on('data', (data) => {
+                  output += data.toString();
+                });
+                itermCheck.on('close', (code) => {
+                  resolve(code === 0 && output.trim() === 'true');
+                });
+                itermCheck.on('error', () => resolve(false));
               });
-              openProc.unref();
+
+              if (itermAvailable) {
+                const nodeCommand = `exec "${nodeBin}" "${escapedScriptPath}" "${escapedSessionId}" "${tempDir}"; exit 0`;
+                const itermCommand = `osascript -e 'tell application "iTerm2" to create window with default profile command "${nodeCommand}"'`;
+
+                return spawn(itermCommand, [], {
+                  stdio: ['ignore', 'ignore', 'ignore'],
+                  shell: true,
+                  detached: true,
+                });
+              }
+              return null;
             } catch (e) {
-              logger.error({ error: e }, 'Fallback open -a Terminal failed');
+              logger.debug({ error: e }, 'iTerm2 launch attempt failed');
+              return null;
             }
           };
 
-          ui = spawn(command, commandArgs, {
-            stdio: ['ignore', 'ignore', 'ignore'],
-            shell: true,
-            detached: true,
-          });
+          // Improved fallback using .command file (avoids AppleScript automation issues)
+          const launchViaCommandFile =
+            async (): Promise<ChildProcess | null> => {
+              try {
+                const launcherPath = path.join(
+                  tempDir,
+                  `interactive-mcp-launch-${sessionId}.command`,
+                );
 
-          // If AppleScript fails or exits non-zero, fallback to open -a Terminal
-          ui.on('error', () => {
-            void launchViaOpenCommand();
-          });
-          ui.on('close', (code: number | null) => {
-            if (code !== null && code !== 0) {
-              void launchViaOpenCommand();
-            }
-          });
+                // Create a more robust launcher script with proper environment setup
+                const scriptContent = [
+                  '#!/bin/bash',
+                  '# Set proper locale and input method environment',
+                  'export LANG=${LANG:-en_US.UTF-8}',
+                  'export LC_ALL=${LC_ALL:-en_US.UTF-8}',
+                  '# Avoid input method conflicts by setting terminal as input-method-aware',
+                  'export __MCP_TERMINAL_LAUNCH=1',
+                  `exec "${nodeBin}" "${escapedScriptPath}" "${escapedSessionId}" "${tempDir}"`,
+                  '',
+                ].join('\n');
+
+                await fsPromises.writeFile(launcherPath, scriptContent, 'utf8');
+                await fsPromises.chmod(launcherPath, 0o755);
+
+                // Use 'open' without AppleScript to avoid automation conflicts
+                const openProc = spawn(
+                  'open',
+                  ['-a', 'Terminal', launcherPath],
+                  {
+                    stdio: ['ignore', 'ignore', 'ignore'],
+                    detached: true,
+                    env: {
+                      ...process.env,
+                      // Prevent AppleScript events from interfering
+                      __MCP_NO_APPLESCRIPT: '1',
+                    },
+                  },
+                );
+
+                // Clean up the .command file after a delay
+                setTimeout(async () => {
+                  try {
+                    await fsPromises.unlink(launcherPath);
+                  } catch (e) {
+                    // Ignore cleanup errors
+                  }
+                }, 5000);
+
+                return openProc;
+              } catch (e) {
+                logger.error({ error: e }, 'Command file launcher failed');
+                // Final fallback: try direct terminal command
+                try {
+                  const nodeCommand = `"${nodeBin}" "${escapedScriptPath}" "${escapedSessionId}" "${tempDir}"`;
+                  return spawn(
+                    'osascript',
+                    [
+                      '-e',
+                      `tell application "Terminal" to do script "${nodeCommand}"`,
+                    ],
+                    {
+                      stdio: ['ignore', 'ignore', 'ignore'],
+                      detached: true,
+                    },
+                  );
+                } catch (finalError) {
+                  logger.error(
+                    { error: finalError },
+                    'All terminal launch methods failed',
+                  );
+                  return null;
+                }
+              }
+            };
+
+          // Try iTerm2 first, fallback to .command file approach
+          ui = await launchViaITerm();
+          if (!ui) {
+            ui = await launchViaCommandFile();
+          }
         } else if (platform === 'win32') {
           // Windows
           // Pass only the sessionId
@@ -206,11 +275,11 @@ export async function getCmdWindowInput(
           }
         };
 
-        ui.on('exit', handleExit);
-        ui.on('error', handleError);
+        ui?.on('exit', handleExit);
+        ui?.on('error', handleError);
 
         // Unref the child process so the parent can exit independently
-        ui.unref();
+        ui?.unref();
 
         // Create an empty temp file before watching for user response
         await fsPromises.writeFile(tempFilePath, '', 'utf8'); // Use renamed import

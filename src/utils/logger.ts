@@ -38,18 +38,18 @@ try {
   if (!fs.existsSync(logDir)) {
     fs.mkdirSync(logDir, { recursive: true });
   }
-  
+
   // Attempt to open the file in append mode to check writability
   const fd = fs.openSync(logFile, 'a');
   fs.closeSync(fd);
-  
+
   // Only log to file, not to console/stdio
   transportConfig = {
     target: 'pino/file',
     options: { destination: logFile, mkdir: true },
     level: isDevelopment ? 'trace' : 'info',
   };
-  
+
   loggerOptions.transport = transportConfig;
 } catch (error) {
   // If file logging fails, use silent mode to avoid any stdio output

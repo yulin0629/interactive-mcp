@@ -33,15 +33,15 @@ export const InteractiveInput: FC<InteractiveInputProps> = ({
     if (interactionTimeoutRef.current) {
       clearTimeout(interactionTimeoutRef.current);
     }
-    
+
     // Notify parent that interaction started
     onInteractionStart?.();
-    
+
     // Set a new timeout to resume after 2 seconds of inactivity
     const timeout = setTimeout(() => {
       onInteractionEnd?.();
     }, 2000);
-    
+
     interactionTimeoutRef.current = timeout;
   };
 
@@ -57,6 +57,18 @@ export const InteractiveInput: FC<InteractiveInputProps> = ({
   useInput((input, key) => {
     // Any key press counts as interaction
     handleInteraction();
+
+    // Ignore input method switching events to prevent conflicts
+    // These are system events that shouldn't trigger UI changes
+    if (key.ctrl && input === ' ') {
+      // Common input method switch combination (Ctrl+Space)
+      // Log but don't process to avoid conflicts
+      logger.debug(
+        'Input method switch detected, ignoring to prevent conflicts',
+      );
+      return;
+    }
+
     if (predefinedOptions.length > 0) {
       if (key.upArrow) {
         setMode('option');
@@ -106,7 +118,7 @@ export const InteractiveInput: FC<InteractiveInputProps> = ({
   const handleInputChange = (value: string) => {
     // Text input change also counts as interaction
     handleInteraction();
-    
+
     if (value !== inputValue) {
       setInputValue(value);
       // If user starts typing, switch to input mode

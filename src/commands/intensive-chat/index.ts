@@ -73,72 +73,142 @@ export async function startIntensiveChatSession(
 
   // Platform-specific spawning
   const platform = os.platform();
-  let childProcess: ChildProcess;
+  let childProcess: ChildProcess | null = null;
 
   if (platform === 'darwin') {
-    // macOS
-    // Escape potential special characters in paths/payload for the shell command
-    // For the shell command executed by 'do script', we primarily need to handle spaces
-    // or other characters that might break the command if paths aren't quoted.
-    // The `${...}` interpolation within backticks handles basic variable insertion.
-    // Quoting the paths within nodeCommand handles spaces.
+    // macOS - Use improved terminal launch approach to prevent input method conflicts
     const escapedScriptPath = uiScriptPath; // Keep original path, rely on quotes below
     const escapedPayload = payload; // Keep original payload, rely on quotes below
-
-    // Construct the command string directly for the shell. Quotes handle paths with spaces.
     const nodeBin = process.execPath;
-    const nodeCommand = `exec "${nodeBin}" "${escapedScriptPath}" "${escapedPayload}"; exit 0`;
 
-    // Escape the node command for osascript's AppleScript string:
-    // 1. Escape existing backslashes (\ -> \\)
-    // 2. Escape double quotes (" -> \")
-    const escapedNodeCommand = nodeCommand
-      // Escape backslashes first
-      .replace(/\\/g, '\\\\') // Using /\\/g instead of /\/g
-      // Then escape double quotes
-      .replace(/"/g, '\\"');
+    // Primary: Try iTerm2 first (better input method support)
+    const launchViaITerm = async (): Promise<ChildProcess | null> => {
+      try {
+        // Check if iTerm2 is available and running
+        const itermCheck = spawn('osascript', [
+          '-e',
+          'tell application "System Events" to exists application process "iTerm2"',
+        ]);
 
-    // Activate Terminal first, then do script with exec
-    const command = `osascript -e 'tell application "Terminal" to activate' -e 'tell application "Terminal" to do script "${escapedNodeCommand}"'`;
-    const commandArgs: string[] = []; // No args needed when command is a single string for shell
+        const itermAvailable = await new Promise<boolean>((resolve) => {
+          let output = '';
+          itermCheck.stdout?.on('data', (data) => {
+            output += data.toString();
+          });
+          itermCheck.on('close', (code) => {
+            resolve(code === 0 && output.trim() === 'true');
+          });
+          itermCheck.on('error', () => resolve(false));
+        });
 
-    // Fallback launcher using .command + open -a Terminal
-    const launchViaOpenCommand = async () => {
+        if (itermAvailable) {
+          const nodeCommand = `exec "${nodeBin}" "${escapedScriptPath}" "${escapedPayload}"; exit 0`;
+          const itermCommand = `osascript -e 'tell application "iTerm2" to create window with default profile command "${nodeCommand}"'`;
+
+          return spawn(itermCommand, [], {
+            stdio: ['ignore', 'ignore', 'ignore'],
+            shell: true,
+            detached: true,
+          });
+        }
+        return null;
+      } catch (e) {
+        logger.debug(
+          { error: e },
+          'iTerm2 launch attempt failed for intensive chat',
+        );
+        return null;
+      }
+    };
+
+    // Improved fallback using .command file (avoids AppleScript automation issues)
+    const launchViaCommandFile = async (): Promise<ChildProcess | null> => {
       try {
         const launcherPath = path.join(
           sessionDir,
           `interactive-mcp-intchat-${sessionId}.command`,
         );
-        const scriptContent = `#!/bin/bash\nexec "${process.execPath}" "${escapedScriptPath}" "${escapedPayload}"\n`;
+
+        // Create a more robust launcher script with proper environment setup
+        const scriptContent = [
+          '#!/bin/bash',
+          '# Set proper locale and input method environment',
+          'export LANG=${LANG:-en_US.UTF-8}',
+          'export LC_ALL=${LC_ALL:-en_US.UTF-8}',
+          '# Mark as MCP terminal to avoid input method conflicts',
+          'export __MCP_TERMINAL_LAUNCH=1',
+          '# Set terminal title to indicate this is an MCP session',
+          'echo -e "\\033]0;MCP Intensive Chat Session\\007"',
+          `exec "${process.execPath}" "${escapedScriptPath}" "${escapedPayload}"`,
+          '',
+        ].join('\n');
+
         await fs.writeFile(launcherPath, scriptContent, 'utf8');
         await fs.chmod(launcherPath, 0o755);
+
         const openProc = spawn('open', ['-a', 'Terminal', launcherPath], {
           stdio: ['ignore', 'ignore', 'ignore'],
           detached: true,
+          env: {
+            ...process.env,
+            // Prevent AppleScript events from interfering
+            __MCP_NO_APPLESCRIPT: '1',
+          },
         });
-        openProc.unref();
+
+        // Clean up the .command file after a delay
+        setTimeout(async () => {
+          try {
+            await fs.unlink(launcherPath);
+          } catch (e) {
+            // Ignore cleanup errors
+          }
+        }, 5000);
+
+        return openProc;
       } catch (e) {
         logger.error(
           { error: e },
-          'Fallback open -a Terminal failed (intensive chat)',
+          'Command file launcher failed (intensive chat)',
         );
+
+        // Final fallback: try direct terminal command
+        try {
+          const nodeCommand = `"${process.execPath}" "${escapedScriptPath}" "${escapedPayload}"`;
+          return spawn(
+            'osascript',
+            ['-e', `tell application "Terminal" to do script "${nodeCommand}"`],
+            {
+              stdio: ['ignore', 'ignore', 'ignore'],
+              detached: true,
+            },
+          );
+        } catch (finalError) {
+          logger.error(
+            { error: finalError },
+            'All terminal launch methods failed for intensive chat',
+          );
+          return null;
+        }
       }
     };
 
-    childProcess = spawn(command, commandArgs, {
-      stdio: ['ignore', 'ignore', 'ignore'],
-      shell: true,
-      detached: true,
-    });
+    // Try iTerm2 first, fallback to .command file approach
+    childProcess = await launchViaITerm();
+    if (!childProcess) {
+      childProcess = await launchViaCommandFile();
+    }
 
-    childProcess.on('error', () => {
-      void launchViaOpenCommand();
-    });
-    childProcess.on('close', (code: number | null) => {
-      if (code !== null && code !== 0) {
-        void launchViaOpenCommand();
-      }
-    });
+    // If all methods failed, create a dummy process to prevent errors
+    if (!childProcess) {
+      logger.error(
+        'Failed to launch terminal for intensive chat, using fallback',
+      );
+      childProcess = spawn('echo', ['Terminal launch failed'], {
+        stdio: ['ignore', 'ignore', 'ignore'],
+        detached: true,
+      });
+    }
   } else if (platform === 'win32') {
     // Windows
     childProcess = spawn(process.execPath, [uiScriptPath, payload], {
@@ -154,6 +224,13 @@ export async function startIntensiveChatSession(
       shell: true,
       detached: true,
     });
+  }
+
+  // Ensure we have a valid process
+  if (!childProcess) {
+    throw new Error(
+      'Failed to create terminal process for intensive chat session',
+    );
   }
 
   // Unref the process so it can run independently

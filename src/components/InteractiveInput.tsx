@@ -55,79 +55,105 @@ export const InteractiveInput: FC<InteractiveInputProps> = ({
   }, []); // Empty dependency array - only run on mount/unmount
 
   useInput((input, key) => {
-    // Any key press counts as interaction
-    handleInteraction();
+    try {
+      // Any key press counts as interaction
+      handleInteraction();
 
-    // Ignore input method switching events to prevent conflicts
-    // These are system events that shouldn't trigger UI changes
-    if (key.ctrl && input === ' ') {
-      // Common input method switch combination (Ctrl+Space)
-      // Log but don't process to avoid conflicts
-      logger.debug(
-        'Input method switch detected, ignoring to prevent conflicts',
-      );
-      return;
-    }
-
-    if (predefinedOptions.length > 0) {
-      if (key.upArrow) {
-        setMode('option');
-        setSelectedIndex(
-          (prev) =>
-            (prev - 1 + predefinedOptions.length) % predefinedOptions.length,
+      // Ignore input method switching events to prevent conflicts
+      // These are system events that shouldn't trigger UI changes
+      if (key.ctrl && input === ' ') {
+        // Common input method switch combination (Ctrl+Space)
+        // Log but don't process to avoid conflicts
+        logger.debug(
+          'Input method switch detected, ignoring to prevent conflicts',
         );
         return;
       }
 
-      if (key.downArrow) {
-        setMode('option');
-        setSelectedIndex((prev) => (prev + 1) % predefinedOptions.length);
+      if (predefinedOptions.length > 0) {
+        if (key.upArrow) {
+          setMode('option');
+          setSelectedIndex(
+            (prev) =>
+              (prev - 1 + predefinedOptions.length) % predefinedOptions.length,
+          );
+          return;
+        }
+
+        if (key.downArrow) {
+          setMode('option');
+          setSelectedIndex((prev) => (prev + 1) % predefinedOptions.length);
+          return;
+        }
+      }
+
+      if (key.return) {
+        if (mode === 'option' && predefinedOptions.length > 0) {
+          onSubmit(questionId, predefinedOptions[selectedIndex]);
+        } else {
+          onSubmit(questionId, inputValue);
+        }
         return;
       }
-    }
 
-    if (key.return) {
-      if (mode === 'option' && predefinedOptions.length > 0) {
-        onSubmit(questionId, predefinedOptions[selectedIndex]);
-      } else {
-        onSubmit(questionId, inputValue);
+      // Any other key press switches to input mode
+      // Improved handling for Chinese characters and multibyte input
+      if (
+        !key.ctrl &&
+        !key.meta &&
+        !key.escape &&
+        !key.tab &&
+        !key.shift &&
+        !key.leftArrow &&
+        !key.rightArrow &&
+        input
+      ) {
+        // Validate input is printable (including Chinese characters)
+        const isPrintable = /^[\x20-\x7E\u00A0-\uFFFF]+$/.test(input);
+        if (isPrintable) {
+          setMode('input');
+          // Update inputValue only if switching to input mode via typing
+          // TextInput's onChange will handle subsequent typing
+          if (mode === 'option') {
+            setInputValue(input); // Start input with the typed character
+          }
+        } else {
+          logger.debug('Non-printable character ignored in main input', {
+            input: input,
+            charCodes: Array.from(input).map((c: string) => c.charCodeAt(0)).join(',')
+          });
+        }
       }
-      return;
-    }
-
-    // Any other key press switches to input mode
-    if (
-      !key.ctrl &&
-      !key.meta &&
-      !key.escape &&
-      !key.tab &&
-      !key.shift &&
-      !key.leftArrow &&
-      !key.rightArrow &&
-      input
-    ) {
-      setMode('input');
-      // Update inputValue only if switching to input mode via typing
-      // TextInput's onChange will handle subsequent typing
-      if (mode === 'option') {
-        setInputValue(input); // Start input with the typed character
-      }
+    } catch (error) {
+      // Prevent crashes from input handling errors
+      logger.error(
+        { error: error instanceof Error ? error.message : String(error) },
+        'Error in main input handling, continuing...',
+      );
     }
   });
 
   const handleInputChange = (value: string) => {
-    // Text input change also counts as interaction
-    handleInteraction();
+    try {
+      // Text input change also counts as interaction
+      handleInteraction();
 
-    if (value !== inputValue) {
-      setInputValue(value);
-      // If user starts typing, switch to input mode
-      if (value.length > 0 && mode === 'option') {
-        setMode('input');
-      } else if (value.length === 0 && predefinedOptions.length > 0) {
-        // Optionally switch back to option mode if input is cleared
-        // setMode('option');
+      if (value !== inputValue) {
+        setInputValue(value);
+        // If user starts typing, switch to input mode
+        if (value.length > 0 && mode === 'option') {
+          setMode('input');
+        } else if (value.length === 0 && predefinedOptions.length > 0) {
+          // Optionally switch back to option mode if input is cleared
+          // setMode('option');
+        }
       }
+    } catch (error) {
+      // Prevent crashes from input change handling
+      logger.error(
+        { error: error instanceof Error ? error.message : String(error), value },
+        'Error in input change handling, continuing...',
+      );
     }
   };
 

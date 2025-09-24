@@ -36,21 +36,24 @@ export const InteractiveInput: FC<InteractiveInputProps> = ({
     }
   }, [predefinedOptions]);
 
-  // Capture key presses
+  // Capture key presses with enhanced Chinese character support
   useInput((input, key) => {
-    // Ignore input method switching events to prevent Terminal conflicts
-    // These are system events that shouldn't trigger UI changes
-    if (key.ctrl && input === ' ') {
-      // Common input method switch combination (Ctrl+Space)
-      // Don't process to avoid interfering with system input method switching
-      return;
-    }
+    try {
+      // Ignore input method switching events to prevent Terminal conflicts
+      // These are system events that shouldn't trigger UI changes
+      if (key.ctrl && input === ' ') {
+        // Common input method switch combination (Ctrl+Space)
+        // Don't process to avoid interfering with system input method switching
+        logger.debug('Input method switch (Ctrl+Space) detected, ignoring');
+        return;
+      }
 
-    // Handle Cmd+Space on macOS (Spotlight/Input method switch)
-    if (key.meta && input === ' ') {
-      // Let the system handle this, don't interfere
-      return;
-    }
+      // Handle Cmd+Space on macOS (Spotlight/Input method switch)
+      if (key.meta && input === ' ') {
+        // Let the system handle this, don't interfere
+        logger.debug('Input method switch (Cmd+Space) detected, ignoring');
+        return;
+      }
 
     if ((key.upArrow || key.downArrow) && predefinedOptions?.length) {
       // cycle selection among predefined options
@@ -89,29 +92,54 @@ export const InteractiveInput: FC<InteractiveInputProps> = ({
     } else if (key.backspace || key.delete) {
       if (mode === 'custom') {
         if (key.delete && cursorPosition < customValue.length) {
-          // Delete: remove character at cursor position
-          setCustomValue(
-            (prev) =>
-              prev.slice(0, cursorPosition) + prev.slice(cursorPosition + 1),
-          );
+          // Delete: remove character at cursor position (handle multibyte properly)
+          const chars = Array.from(customValue);
+          if (cursorPosition < chars.length) {
+            chars.splice(cursorPosition, 1);
+            setCustomValue(chars.join(''));
+          }
         } else if (key.backspace && cursorPosition > 0) {
-          // Backspace: remove character before cursor and move cursor left
-          setCustomValue(
-            (prev) =>
-              prev.slice(0, cursorPosition - 1) + prev.slice(cursorPosition),
-          );
-          setCursorPosition((prev) => prev - 1);
+          // Backspace: remove character before cursor (handle multibyte properly)
+          const chars = Array.from(customValue);
+          if (cursorPosition > 0 && cursorPosition <= chars.length) {
+            chars.splice(cursorPosition - 1, 1);
+            setCustomValue(chars.join(''));
+            setCursorPosition((prev) => Math.max(0, prev - 1));
+          }
         }
       }
-    } else if (input && input.length === 1 && !key.ctrl && !key.meta) {
-      // Any other non-modifier key appends to custom input
-      setMode('custom');
-      // Insert at cursor position instead of appending
-      setCustomValue(
-        (prev) =>
-          prev.slice(0, cursorPosition) + input + prev.slice(cursorPosition),
+    } else if (input && input.length > 0 && !key.ctrl && !key.meta) {
+      // Handle all printable input including Chinese characters and composition states
+      // Validate input is printable (including Chinese characters)
+      const isPrintable = /^[\x20-\x7E\u00A0-\uFFFF]+$/.test(input);
+      if (isPrintable) {
+        setMode('custom');
+        
+        // Handle multibyte character input properly
+        // Calculate proper cursor advancement for the input string
+        const inputLength = Array.from(input).length; // Proper Unicode length counting
+        
+        // Insert at cursor position instead of appending
+          setCustomValue(
+            (prev) =>
+              prev.slice(0, cursorPosition) + input + prev.slice(cursorPosition),
+          );
+          setCursorPosition((prev) => prev + inputLength);
+        } else {
+          // Log non-printable input for debugging
+          logger.debug('Non-printable input ignored', {
+            input: input,
+            length: input.length,
+            charCodes: Array.from(input).map((c: string) => c.charCodeAt(0)).join(',')
+          });
+        }
+      }
+    } catch (globalError) {
+      // Global error handler for any unexpected issues in input processing
+      logger.error(
+        { error: globalError instanceof Error ? globalError.message : String(globalError) },
+        'Unexpected error in input processing, continuing...',
       );
-      setCursorPosition((prev) => prev + 1);
     }
   });
 

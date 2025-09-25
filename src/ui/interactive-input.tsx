@@ -24,6 +24,10 @@ export const InteractiveInput: FC<InteractiveInputProps> = ({
   const [cursorPosition, setCursorPosition] = useState(0);
   // Get the character under cursor, if any
   const charUnderCursor = customValue[cursorPosition] || null;
+  
+  // Terminal.app safety check for legacy UI
+  const isTerminalApp = process.env.TERM_PROGRAM === 'Apple_Terminal';
+  const isInputMethodSafeMode = process.env.INPUT_METHOD_SAFE === '1';
 
   // If there are no predefined options, default to custom input mode
   useEffect(() => {
@@ -39,6 +43,21 @@ export const InteractiveInput: FC<InteractiveInputProps> = ({
   // Capture key presses with enhanced Chinese character support
   useInput((input, key) => {
     try {
+      // Terminal.app specific crash prevention for legacy UI
+      if (isTerminalApp && input && typeof input === 'string') {
+        // Be extra cautious with input processing in Terminal.app
+        // Filter out potentially problematic sequences that might crash Terminal.app
+        const hasComplexInputSequences = /[\u0300-\u036f\u1ab0-\u1aff\u1dc0-\u1dff]/.test(input); // Combining marks
+        const hasInputMethodMarkers = /[\ue000-\uf8ff]/.test(input); // Private use area
+        
+        if (hasComplexInputSequences || hasInputMethodMarkers) {
+          logger.debug('Filtered complex input sequence in Terminal.app legacy UI to prevent crashes', {
+            input: input.split('').map(c => c.charCodeAt(0).toString(16)).join(' ')
+          });
+          return; // Skip processing potentially problematic input
+        }
+      }
+
       // Ignore input method switching events to prevent Terminal conflicts
       // These are system events that shouldn't trigger UI changes
       if (key.ctrl && input === ' ') {
@@ -130,7 +149,7 @@ export const InteractiveInput: FC<InteractiveInputProps> = ({
           logger.debug('Non-printable input ignored', {
             input: input,
             length: input.length,
-            charCodes: Array.from(input).map((c: string) => c.charCodeAt(0)).join(',')
+            charCodes: Array.from(input).map(c => (c as string).charCodeAt(0)).join(',')
           });
         }
       }

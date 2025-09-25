@@ -26,6 +26,10 @@ export const InteractiveInput: FC<InteractiveInputProps> = ({
   const [selectedIndex, setSelectedIndex] = useState<number>(0);
   const [inputValue, setInputValue] = useState<string>('');
   const interactionTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  
+  // Terminal.app safety check
+  const isTerminalApp = process.env.TERM_PROGRAM === 'Apple_Terminal';
+  const isInputMethodSafeMode = process.env.INPUT_METHOD_SAFE === '1';
 
   // Helper function to handle interaction timing
   const handleInteraction = () => {
@@ -56,6 +60,21 @@ export const InteractiveInput: FC<InteractiveInputProps> = ({
 
   useInput((input, key) => {
     try {
+      // Terminal.app specific crash prevention
+      if (isTerminalApp && input && typeof input === 'string') {
+        // Be extra cautious with input processing in Terminal.app
+        // Filter out potentially problematic sequences that might crash Terminal.app
+        const hasComplexInputSequences = /[\u0300-\u036f\u1ab0-\u1aff\u1dc0-\u1dff]/.test(input); // Combining marks
+        const hasInputMethodMarkers = /[\ue000-\uf8ff]/.test(input); // Private use area
+        
+        if (hasComplexInputSequences || hasInputMethodMarkers) {
+          logger.debug('Filtered complex input sequence in Terminal.app to prevent crashes', {
+            input: input.split('').map(c => c.charCodeAt(0).toString(16)).join(' ')
+          });
+          return; // Skip processing potentially problematic input
+        }
+      }
+
       // Any key press counts as interaction
       handleInteraction();
 

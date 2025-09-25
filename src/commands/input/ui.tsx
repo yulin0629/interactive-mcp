@@ -7,6 +7,39 @@ import os from 'os'; // Import os module for tmpdir
 import logger from '../../utils/logger.js';
 import { InteractiveInput } from '../../components/InteractiveInput.js'; // Import shared component
 
+// Terminal.app crash mitigation
+// Detect Terminal.app and apply safer settings to prevent IMK crashes
+if (process.env.TERM_PROGRAM === 'Apple_Terminal') {
+  logger.info('Terminal.app detected - applying input method crash mitigation');
+  
+  // Set safer terminal environment variables
+  process.env.TERM = 'xterm-256color'; // More compatible terminal type
+  process.env.INPUT_METHOD_SAFE = '1'; // Signal for safer input handling
+  
+  // Warn user about potential issues
+  console.warn('⚠️  Terminal.app detected. For better Chinese input support, consider using iTerm2.');
+  console.warn('   Download: https://iterm2.com/');
+  console.warn('   If Terminal crashes during Chinese input, this is a known macOS issue.');
+}
+
+// Enhanced error handling for Terminal crashes
+process.on('uncaughtException', (error) => {
+  if (error.message.includes('SIGABRT') || error.message.includes('NSTextInputContext')) {
+    logger.error('Terminal.app input method crash detected - this is a macOS Terminal.app issue');
+    console.error('🚨 Terminal.app crashed due to input method handling.');
+    console.error('   This is a known issue with macOS Terminal.app and Chinese input.');
+    console.error('   Please consider switching to iTerm2 for better stability.');
+    process.exit(1);
+  } else {
+    logger.error({ error: error.message, stack: error.stack }, 'Uncaught exception in input UI');
+    process.exit(1);
+  }
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+  logger.error({ reason: String(reason), promise: String(promise) }, 'Unhandled promise rejection in input UI');
+});
+
 interface CmdOptions {
   projectName?: string;
   prompt: string;

@@ -1,6 +1,6 @@
 {
   "name": "@yulin0629/interactive-mcp",
-  "version": "1.0.3",
+  "version": "1.0.4",
   "main": "dist/index.js",
   "type": "module",
   "repository": {
@@ -27,7 +27,7 @@
   "keywords": [],
   "author": "",
   "license": "MIT",
-  "description": "",
+  "description": "Enhanced interactive MCP server with configurable terminal launch behaviour",
   "devDependencies": {
     "@eslint/js": "^9.25.1",
     "@semantic-release/commit-analyzer": "^13.0.1",

@@ -92,54 +92,28 @@ export async function getCmdWindowInput(
           const escapedScriptPath = uiScriptPath;
           const escapedSessionId = sessionId; // Only need sessionId now
 
-          // Construct the command string directly for the shell. Quotes handle paths with spaces.
-          // Pass only the sessionId
           const nodeBin = process.execPath;
-          const nodeCommand = `exec "${nodeBin}" "${escapedScriptPath}" "${escapedSessionId}" "${tempDir}"; exit 0`;
+          const launcherPath = path.join(
+            tempDir,
+            `interactive-mcp-launch-${sessionId}.command`,
+          );
+          const scriptContent = `#!/bin/bash\nexec "${nodeBin}" "${escapedScriptPath}" "${escapedSessionId}" "${tempDir}"\n`;
+          await fsPromises.writeFile(launcherPath, scriptContent, 'utf8');
+          await fsPromises.chmod(launcherPath, 0o755);
 
-          // Escape the node command for osascript's AppleScript string:
-          const escapedNodeCommand = nodeCommand
-            .replace(/\\/g, '\\\\') // Escape backslashes
-            .replace(/"/g, '\\"'); // Escape double quotes
+          const preferredApp = process.env.INTERACTIVE_MCP_TERMINAL_APP?.trim();
+          const openArgs = ['-F', launcherPath];
+          if (preferredApp && preferredApp.length > 0) {
+            openArgs.unshift('-a', preferredApp);
+          }
 
-          // Activate Terminal first, then do script with exec
-          const command = `osascript -e 'tell application "Terminal" to activate' -e 'tell application "Terminal" to do script "${escapedNodeCommand}"'`;
-          const commandArgs: string[] = [];
-
-          // Fallback launcher using .command + open -a Terminal (handles Automation issues)
-          const launchViaOpenCommand = async () => {
-            try {
-              const launcherPath = path.join(
-                tempDir,
-                `interactive-mcp-launch-${sessionId}.command`,
-              );
-              const scriptContent = `#!/bin/bash\nexec "${nodeBin}" "${escapedScriptPath}" "${escapedSessionId}" "${tempDir}"\n`;
-              await fsPromises.writeFile(launcherPath, scriptContent, 'utf8');
-              await fsPromises.chmod(launcherPath, 0o755);
-              const openProc = spawn('open', ['-a', 'Terminal', launcherPath], {
-                stdio: ['ignore', 'ignore', 'ignore'],
-                detached: true,
-              });
-              openProc.unref();
-            } catch (e) {
-              logger.error({ error: e }, 'Fallback open -a Terminal failed');
-            }
-          };
-
-          ui = spawn(command, commandArgs, {
+          ui = spawn('open', openArgs, {
             stdio: ['ignore', 'ignore', 'ignore'],
-            shell: true,
             detached: true,
           });
 
-          // If AppleScript fails or exits non-zero, fallback to open -a Terminal
-          ui.on('error', () => {
-            void launchViaOpenCommand();
-          });
-          ui.on('close', (code: number | null) => {
-            if (code !== null && code !== 0) {
-              void launchViaOpenCommand();
-            }
+          ui.on('error', (error) => {
+            logger.error({ error }, 'Failed to launch terminal via open');
           });
         } else if (platform === 'win32') {
           // Windows

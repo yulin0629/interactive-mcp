@@ -76,68 +76,34 @@ export async function startIntensiveChatSession(
   let childProcess: ChildProcess;
 
   if (platform === 'darwin') {
-    // macOS
-    // Escape potential special characters in paths/payload for the shell command
-    // For the shell command executed by 'do script', we primarily need to handle spaces
-    // or other characters that might break the command if paths aren't quoted.
-    // The `${...}` interpolation within backticks handles basic variable insertion.
-    // Quoting the paths within nodeCommand handles spaces.
-    const escapedScriptPath = uiScriptPath; // Keep original path, rely on quotes below
-    const escapedPayload = payload; // Keep original payload, rely on quotes below
+    // macOS — use a temporary .command script and let the system choose the default terminal app
+    const escapedScriptPath = uiScriptPath;
+    const escapedPayload = payload;
 
-    // Construct the command string directly for the shell. Quotes handle paths with spaces.
-    const nodeBin = process.execPath;
-    const nodeCommand = `exec "${nodeBin}" "${escapedScriptPath}" "${escapedPayload}"; exit 0`;
+    const launcherPath = path.join(
+      sessionDir,
+      `interactive-mcp-intchat-${sessionId}.command`,
+    );
+    const scriptContent = `#!/bin/bash\nexec "${process.execPath}" "${escapedScriptPath}" "${escapedPayload}"\n`;
+    await fs.writeFile(launcherPath, scriptContent, 'utf8');
+    await fs.chmod(launcherPath, 0o755);
 
-    // Escape the node command for osascript's AppleScript string:
-    // 1. Escape existing backslashes (\ -> \\)
-    // 2. Escape double quotes (" -> \")
-    const escapedNodeCommand = nodeCommand
-      // Escape backslashes first
-      .replace(/\\/g, '\\\\') // Using /\\/g instead of /\/g
-      // Then escape double quotes
-      .replace(/"/g, '\\"');
+    const preferredApp = process.env.INTERACTIVE_MCP_TERMINAL_APP?.trim();
+    const openArgs = ['-F', launcherPath];
+    if (preferredApp && preferredApp.length > 0) {
+      openArgs.unshift('-a', preferredApp);
+    }
 
-    // Activate Terminal first, then do script with exec
-    const command = `osascript -e 'tell application "Terminal" to activate' -e 'tell application "Terminal" to do script "${escapedNodeCommand}"'`;
-    const commandArgs: string[] = []; // No args needed when command is a single string for shell
-
-    // Fallback launcher using .command + open -a Terminal
-    const launchViaOpenCommand = async () => {
-      try {
-        const launcherPath = path.join(
-          sessionDir,
-          `interactive-mcp-intchat-${sessionId}.command`,
-        );
-        const scriptContent = `#!/bin/bash\nexec "${process.execPath}" "${escapedScriptPath}" "${escapedPayload}"\n`;
-        await fs.writeFile(launcherPath, scriptContent, 'utf8');
-        await fs.chmod(launcherPath, 0o755);
-        const openProc = spawn('open', ['-a', 'Terminal', launcherPath], {
-          stdio: ['ignore', 'ignore', 'ignore'],
-          detached: true,
-        });
-        openProc.unref();
-      } catch (e) {
-        logger.error(
-          { error: e },
-          'Fallback open -a Terminal failed (intensive chat)',
-        );
-      }
-    };
-
-    childProcess = spawn(command, commandArgs, {
+    childProcess = spawn('open', openArgs, {
       stdio: ['ignore', 'ignore', 'ignore'],
-      shell: true,
       detached: true,
     });
 
-    childProcess.on('error', () => {
-      void launchViaOpenCommand();
-    });
-    childProcess.on('close', (code: number | null) => {
-      if (code !== null && code !== 0) {
-        void launchViaOpenCommand();
-      }
+    childProcess.on('error', (error) => {
+      logger.error(
+        { error },
+        'Failed to launch terminal via open (intensive chat)',
+      );
     });
   } else if (platform === 'win32') {
     // Windows

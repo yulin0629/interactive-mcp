@@ -1,18 +1,20 @@
 # interactive-mcp (Enhanced Fork)
 
 > **Fork Note**: This is an enhanced fork of [ttommyth/interactive-mcp](https://github.com/ttommyth/interactive-mcp) with the following improvements:
+>
 > - **Auto-pause countdown timer** when user starts typing
 > - **Silent logging** - logs are written to files only, not to stdio/terminal
 > - **Better user experience** with visual pause indicators
 >
 > ## Installation
+>
 > ```bash
 > # First, configure npm to use GitHub Packages for @yulin0629
 > echo "@yulin0629:registry=https://npm.pkg.github.com" >> ~/.npmrc
-> 
+>
 > # Then use with npx
 > npx @yulin0629/interactive-mcp
-> 
+>
 > # Or configure in Claude MCP
 > claude mcp add interactive-pause -- npx @yulin0629/interactive-mcp
 > ```
@@ -178,6 +180,10 @@ The `interactive-mcp` server accepts the following command-line options. These s
 | ----------------- | ----- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `--timeout`       | `-t`  | Sets the default timeout (in seconds) for user input prompts. Defaults to 30 seconds.                                                                                                                 |
 | `--disable-tools` | `-d`  | Disables specific tools or groups (comma-separated list). Prevents the server from advertising or registering them. Options: `request_user_input`, `message_complete_notification`, `intensive_chat`. |
+
+**Terminal selection on macOS**
+
+By default the server now launches command UIs with the system's default terminal app when running on macOS. Set `INTERACTIVE_MCP_TERMINAL_APP` (for example `Terminal` 或 `iTerm`) before starting the server if you need to target a specific terminal explicitly.
 
 **Example:** Setting multiple options in the client config `args` array:
 
